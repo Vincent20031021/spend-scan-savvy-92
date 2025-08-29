@@ -46,6 +46,20 @@ All colors MUST be HSL.
     --shadow-glow: 0 0 40px hsl(var(--primary-glow) / 0.4);
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
+    /* Category colors */
+    --groceries: 142 71% 45%;
+    --household: 43 96% 56%;
+    --personal-care: 294 84% 52%;
+    --electronics: 217 91% 60%;
+    --clothing: 340 82% 52%;
+    --dining: 25 95% 53%;
+
+    /* Sustainability colors */
+    --eco-excellent: 120 100% 25%;
+    --eco-good: 142 71% 45%;
+    --eco-fair: 43 96% 56%;
+    --eco-poor: 0 84% 60%;
+
     --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;

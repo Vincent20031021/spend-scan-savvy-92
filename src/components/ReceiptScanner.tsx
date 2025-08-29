@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Camera, Upload, Scan, Receipt, TrendingUp } from "lucide-react";
+import { Camera, Upload, Scan, Receipt, TrendingUp, Leaf, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const ReceiptScanner = () => {
@@ -14,7 +14,8 @@ const ReceiptScanner = () => {
       total: 47.82,
       items: 8,
       date: "Today",
-      category: "Groceries"
+      category: "Groceries",
+      sustainabilityScore: 85
     },
     {
       id: 2,
@@ -22,21 +23,66 @@ const ReceiptScanner = () => {
       total: 23.15,
       items: 3,
       date: "Yesterday", 
-      category: "Household"
+      category: "Household",
+      sustainabilityScore: 62
+    },
+    {
+      id: 3,
+      store: "Starbucks",
+      total: 12.45,
+      items: 2,
+      date: "2 days ago", 
+      category: "Dining",
+      sustainabilityScore: 40
     }
   ]);
+
+  const categoryColors = {
+    "Groceries": "bg-category-groceries",
+    "Household": "bg-category-household", 
+    "Personal Care": "bg-category-personal-care",
+    "Electronics": "bg-category-electronics",
+    "Clothing": "bg-category-clothing",
+    "Dining": "bg-category-dining"
+  };
+
+  const getSustainabilityColor = (score: number) => {
+    if (score >= 80) return "text-sustainability-excellent";
+    if (score >= 60) return "text-sustainability-good";
+    if (score >= 40) return "text-sustainability-fair";
+    return "text-sustainability-poor";
+  };
+
+  const getSustainabilityGrade = (score: number) => {
+    if (score >= 80) return "A";
+    if (score >= 60) return "B";
+    if (score >= 40) return "C";
+    return "D";
+  };
   
   const { toast } = useToast();
 
   const handleScanReceipt = () => {
     setIsScanning(true);
-    // Simulate scanning process
+    // Simulate scanning process with enhanced feedback
     setTimeout(() => {
       setIsScanning(false);
       toast({
-        title: "Receipt processed!",
-        description: "Your receipt has been scanned and categorized.",
+        title: "Receipt processed! 🎉",
+        description: "Your receipt has been scanned, categorized, and sustainability score calculated.",
       });
+      
+      // Add a new receipt to simulate the scan result
+      const newReceipt = {
+        id: Date.now(),
+        store: "Fresh Market",
+        total: 32.67,
+        items: 6,
+        date: "Just now",
+        category: "Groceries",
+        sustainabilityScore: Math.floor(Math.random() * 40) + 60 // Random score 60-100
+      };
+      setRecentReceipts(prev => [newReceipt, ...prev]);
     }, 2000);
   };
 
@@ -60,17 +106,26 @@ const ReceiptScanner = () => {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-2 gap-4 mb-8">
-          <Card className="bg-white/10 backdrop-blur-sm border-white/20">
+        <div className="grid grid-cols-3 gap-3 mb-8">
+          <Card className="bg-white/10 backdrop-blur-sm border-white/20 animate-fade-in">
             <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-white">$142.67</div>
-              <div className="text-white/70 text-sm">This Week</div>
+              <div className="text-xl font-bold text-white">$142.67</div>
+              <div className="text-white/70 text-xs">This Week</div>
             </CardContent>
           </Card>
-          <Card className="bg-white/10 backdrop-blur-sm border-white/20">
+          <Card className="bg-white/10 backdrop-blur-sm border-white/20 animate-fade-in">
             <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-white">23</div>
-              <div className="text-white/70 text-sm">Receipts</div>
+              <div className="text-xl font-bold text-white">23</div>
+              <div className="text-white/70 text-xs">Receipts</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white/10 backdrop-blur-sm border-white/20 animate-fade-in">
+            <CardContent className="p-4 text-center">
+              <div className="flex items-center justify-center gap-1">
+                <Leaf className="w-4 h-4 text-sustainability-good" />
+                <div className="text-xl font-bold text-sustainability-good">B+</div>
+              </div>
+              <div className="text-white/70 text-xs">Eco Score</div>
             </CardContent>
           </Card>
         </div>
@@ -80,12 +135,17 @@ const ReceiptScanner = () => {
           <Button
             onClick={handleScanReceipt}
             disabled={isScanning}
-            className="h-24 bg-white/20 backdrop-blur-sm border-white/30 hover:bg-white/30 text-white font-semibold"
+            className={`h-24 bg-white/20 backdrop-blur-sm border-white/30 hover:bg-white/30 text-white font-semibold transition-all duration-300 hover:scale-105 active:scale-95 ${
+              isScanning ? 'animate-pulse-scale' : ''
+            }`}
             variant="outline"
           >
             <div className="flex flex-col items-center gap-2">
               {isScanning ? (
-                <Scan className="w-6 h-6 animate-pulse" />
+                <div className="relative">
+                  <Scan className="w-6 h-6 animate-spin" />
+                  <div className="absolute inset-0 bg-white/20 rounded-full animate-ping"></div>
+                </div>
               ) : (
                 <Camera className="w-6 h-6" />
               )}
@@ -95,7 +155,7 @@ const ReceiptScanner = () => {
           
           <Button
             onClick={handleUploadReceipt}
-            className="h-24 bg-white/20 backdrop-blur-sm border-white/30 hover:bg-white/30 text-white font-semibold"
+            className="h-24 bg-white/20 backdrop-blur-sm border-white/30 hover:bg-white/30 text-white font-semibold transition-all duration-300 hover:scale-105 active:scale-95"
             variant="outline"
           >
             <div className="flex flex-col items-center gap-2">
@@ -115,15 +175,27 @@ const ReceiptScanner = () => {
             <CardDescription>Your latest spending activity</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {recentReceipts.map((receipt) => (
-              <div key={receipt.id} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+            {recentReceipts.map((receipt, index) => (
+              <div 
+                key={receipt.id} 
+                className="flex items-center justify-between p-4 bg-muted/50 rounded-lg hover:bg-muted/70 transition-all duration-200 hover:scale-[1.02] animate-fade-in"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
                 <div className="flex-1">
                   <div className="font-semibold text-foreground">{receipt.store}</div>
                   <div className="text-sm text-muted-foreground">{receipt.items} items • {receipt.date}</div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Leaf className="w-3 h-3" />
+                    <span className={`text-xs font-medium ${getSustainabilityColor(receipt.sustainabilityScore)}`}>
+                      Eco Score: {getSustainabilityGrade(receipt.sustainabilityScore)} ({receipt.sustainabilityScore}%)
+                    </span>
+                  </div>
                 </div>
                 <div className="text-right">
                   <div className="font-bold text-lg">${receipt.total}</div>
-                  <Badge variant="secondary" className="text-xs">
+                  <Badge 
+                    className={`text-xs text-white ${categoryColors[receipt.category as keyof typeof categoryColors] || 'bg-secondary'}`}
+                  >
                     {receipt.category}
                   </Badge>
                 </div>
