@@ -83,13 +83,20 @@ export function useReceipts() {
         hasAccessToken: !!session.access_token
       });
 
+      const requestBody = {
+        imageBase64: imageBase64.trim(),
+        fileName: fileName || `receipt-${Date.now()}.jpg`
+      };
+
+      console.log('Request body structure:', {
+        imageBase64Length: requestBody.imageBase64.length,
+        fileName: requestBody.fileName,
+        bodyKeys: Object.keys(requestBody)
+      });
+
       const { data, error } = await supabase.functions.invoke('process-receipt', {
-        body: JSON.stringify({ 
-          imageBase64: imageBase64.trim(), 
-          fileName: fileName || `receipt-${Date.now()}.jpg`
-        }),
+        body: requestBody,
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
       });
