@@ -51,7 +51,7 @@ serve(async (req) => {
       .from('receipt-images')
       .upload(imagePath, imageBuffer, {
         contentType: 'image/jpeg',
-        upsert: false
+        upsert: true  // Allow overwrite to avoid conflicts
       });
 
     if (uploadError) {
@@ -64,38 +64,80 @@ serve(async (req) => {
     // Process image with Google Vision API
     let extractedData = null;
     
-    if (googleVisionApiKey) {
-      try {
-        const visionResponse = await fetch(
-          `https://vision.googleapis.com/v1/images:annotate?key=${googleVisionApiKey}`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              requests: [{
-                image: { content: imageBase64 },
-                features: [
-                  { type: 'TEXT_DETECTION', maxResults: 1 },
-                  { type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 }
-                ]
-              }]
-            })
-          }
-        );
+    if (!googleVisionApiKey) {
+      console.error('Google Vision API key not configured');
+      throw new Error('Google Vision API key not configured');
+    }
 
-        const visionData = await visionResponse.json();
-        
-        if (visionData.responses && visionData.responses[0] && visionData.responses[0].textAnnotations) {
-          const fullText = visionData.responses[0].textAnnotations[0]?.description || '';
-          extractedData = parseReceiptText(fullText);
-          console.log('Extracted data:', extractedData);
+    try {
+      console.log('Calling Google Vision API...');
+      const visionResponse = await fetch(
+        `https://vision.googleapis.com/v1/images:annotate?key=${googleVisionApiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            requests: [{
+              image: { content: imageBase64 },
+              features: [
+                { type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 }
+              ]
+            }]
+          })
         }
-      } catch (error) {
-        console.error('Vision API error:', error);
-        // Continue without OCR if Vision API fails
+      );
+
+      if (!visionResponse.ok) {
+        const errorText = await visionResponse.text();
+        console.error('Vision API HTTP error:', visionResponse.status, errorText);
+        throw new Error(`Vision API error: ${visionResponse.status}`);
       }
+
+      const visionData = await visionResponse.json();
+      console.log('Vision API response:', JSON.stringify(visionData, null, 2));
+      
+      if (visionData.error) {
+        console.error('Vision API returned error:', visionData.error);
+        throw new Error(`Vision API error: ${visionData.error.message}`);
+      }
+      
+      if (visionData.responses && visionData.responses[0] && visionData.responses[0].textAnnotations) {
+        const fullText = visionData.responses[0].textAnnotations[0]?.description || '';
+        console.log('Extracted raw text length:', fullText.length);
+        console.log('First 500 chars:', fullText.substring(0, 500));
+        
+        if (fullText.trim()) {
+          extractedData = parseReceiptText(fullText);
+          console.log('Parsed data:', JSON.stringify(extractedData, null, 2));
+        } else {
+          console.log('No text extracted from image');
+          extractedData = {
+            storeName: 'Unknown Store',
+            totalAmount: 0,
+            date: new Date().toISOString().split('T')[0],
+            items: [],
+            category: 'Other',
+            currency: 'USD',
+            rawText: ''
+          };
+        }
+      } else {
+        console.log('No text annotations in Vision API response');
+        extractedData = {
+          storeName: 'Unknown Store',
+          totalAmount: 0,
+          date: new Date().toISOString().split('T')[0],
+          items: [],
+          category: 'Other',
+          currency: 'USD',
+          rawText: ''
+        };
+      }
+    } catch (error) {
+      console.error('Vision API error:', error);
+      throw error;
     }
 
     // Get image URL
@@ -150,11 +192,26 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ 
-      success: true, 
-      receipt,
-      extractedData 
-    }), {
+    // Return structured response
+    const response = {
+      success: true,
+      receipt_id: receipt.id,
+      receipt: {
+        id: receipt.id,
+        store_name: receipt.store_name,
+        total_amount: receipt.total_amount,
+        purchase_date: receipt.purchase_date,
+        category: receipt.category,
+        sustainability_score: receipt.sustainability_score,
+        image_url: receipt.image_url
+      },
+      items: extractedData?.items || [],
+      extracted_data: extractedData
+    };
+
+    console.log('Returning response:', JSON.stringify(response, null, 2));
+
+    return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
@@ -330,45 +387,73 @@ function parseReceiptText(text: string) {
 
   // Extract items - improved patterns
   const items = [];
-  const itemPatterns = [
-    /^(.+?)\s+\$?([\d,]+\.?\d{0,2})$/,  // Item name followed by price
-    /^(.+?)\s{2,}\$?([\d,]+\.?\d{0,2})$/,  // With multiple spaces
-    /^(.+?)\t+\$?([\d,]+\.?\d{0,2})$/,  // With tabs
-    /^([\w\s]+)\s+(\d+)\s+@\s+\$?([\d,]+\.?\d{0,2})/,  // With quantity format
+  const skipPatterns = [
+    /^(total|subtotal|tax|balance|change|payment|cash|credit|debit|receipt|thank|you|store|address|phone|date|time)/i,
+    /^\s*$/, // Empty lines
+    /^[\d\-\/\s:]+$/, // Just dates/times
+    /^[#*\-=]+$/, // Just symbols
   ];
   
-  for (const line of lines) {
-    // Skip lines that are likely headers or totals
-    if (line.toLowerCase().match(/(total|tax|subtotal|balance|change|payment|cash|credit|debit)/)) {
+  const itemPatterns = [
+    /^(.+?)\s+\$?([\d,]+\.\d{2})$/,  // Item name followed by price with cents
+    /^(.+?)\s{2,}\$?([\d,]+\.\d{2})$/,  // With multiple spaces
+    /^(.+?)\t+\$?([\d,]+\.\d{2})$/,  // With tabs
+    /^([\w\s\-'&\.]+)\s+(\d+)\s*@\s*\$?([\d,]+\.\d{2})/,  // Quantity format: "Item 2 @ $3.99"
+    /^([\w\s\-'&\.]+)\s+(\d+)\s*x\s*\$?([\d,]+\.\d{2})/i,  // Quantity format: "Item 2 x $3.99"
+    /^\s*(.+?)\s+(\d+\.\d{2})\s*$/,  // Simple: "Item Name 4.99"
+  ];
+  
+  console.log(`Processing ${lines.length} lines for items`);
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Skip empty lines or lines matching skip patterns
+    if (!line || skipPatterns.some(pattern => pattern.test(line))) {
       continue;
     }
     
+    // Try each pattern
+    let itemFound = false;
     for (const pattern of itemPatterns) {
       const match = line.match(pattern);
       if (match) {
         let price = 0;
         let name = '';
+        let quantity = 1;
         
         if (match.length === 3) {
+          // Simple name + price
           name = match[1].trim();
-          price = parseFloat(match[2].replace(/,/g, ''));
+          price = parseFloat(match[2].replace(/[$,]/g, ''));
         } else if (match.length === 4) {
-          // Quantity format
+          // Name + quantity + price
           name = match[1].trim();
-          const qty = parseInt(match[2]);
-          const unitPrice = parseFloat(match[3].replace(/,/g, ''));
-          price = qty * unitPrice;
+          quantity = parseInt(match[2]) || 1;
+          const unitPrice = parseFloat(match[3].replace(/[$,]/g, ''));
+          price = quantity * unitPrice;
         }
         
+        // Clean up name
+        name = name.replace(/[^\w\s\-'&\.]/g, '').trim();
+        
         // Validate item
-        if (name.length > 2 && price > 0 && price < (totalAmount || 1000)) {
+        if (name.length >= 2 && 
+            name.length <= 50 && 
+            price > 0 && 
+            price <= 1000 && // Reasonable price limit
+            !name.match(/^\d+$/) && // Not just numbers
+            !name.toLowerCase().match(/(total|tax|subtotal|change|payment|cash|credit|debit)/)
+        ) {
           items.push({
-            name: name.substring(0, 100), // Limit name length
-            price: price,
+            name: name.substring(0, 100),
+            price: Math.round(price * 100) / 100, // Round to 2 decimals
             category: categorizeItem(name),
-            quantity: 1
+            quantity: quantity
           });
-          break; // Found a match, move to next line
+          console.log(`Found item: ${name} - $${price} (qty: ${quantity})`);
+          itemFound = true;
+          break;
         }
       }
     }
@@ -399,24 +484,39 @@ function parseReceiptText(text: string) {
 function categorizeItem(itemName: string): string {
   const name = itemName.toLowerCase();
   
-  if (name.includes('coffee') || name.includes('tea') || name.includes('drink') || 
-      name.includes('soda') || name.includes('juice')) {
+  // Food & Beverages
+  if (name.match(/(coffee|tea|drink|soda|juice|water|beer|wine|alcohol|beverage)/)) {
     return 'Dining';
   }
   
-  if (name.includes('bread') || name.includes('milk') || name.includes('egg') ||
-      name.includes('fruit') || name.includes('vegetable') || name.includes('meat')) {
+  // Groceries - Food items
+  if (name.match(/(bread|milk|egg|fruit|vegetable|meat|chicken|beef|pork|fish|cheese|yogurt|cereal|rice|pasta|apple|banana|tomato|lettuce|onion|potato|carrot|broccoli|spinach|organic|fresh)/)) {
     return 'Groceries';
   }
   
-  if (name.includes('soap') || name.includes('detergent') || name.includes('clean') ||
-      name.includes('tissue') || name.includes('paper')) {
+  // Household items
+  if (name.match(/(soap|detergent|clean|tissue|paper|towel|bag|foil|wrap|plate|cup|fork|knife|spoon|dish|laundry|bleach|sponge)/)) {
     return 'Household';
   }
   
-  if (name.includes('shampoo') || name.includes('toothpaste') || name.includes('lotion') ||
-      name.includes('deodorant')) {
+  // Personal Care
+  if (name.match(/(shampoo|toothpaste|lotion|deodorant|soap|brush|razor|makeup|perfume|cologne|lip|face|hand|body|skin|hair)/)) {
     return 'Personal Care';
+  }
+  
+  // Health & Medicine
+  if (name.match(/(medicine|vitamin|pill|tablet|capsule|bandage|aspirin|tylenol|advil|pharmacy|rx|prescription)/)) {
+    return 'Health';
+  }
+  
+  // Electronics
+  if (name.match(/(phone|computer|laptop|tablet|cable|charger|battery|electronic|tech|digital)/)) {
+    return 'Electronics';
+  }
+  
+  // Clothing
+  if (name.match(/(shirt|pants|dress|shoe|sock|hat|jacket|coat|jeans|sweater|underwear|bra|clothing|apparel)/)) {
+    return 'Clothing';
   }
   
   return 'Other';
@@ -467,24 +567,46 @@ function determineReceiptCategory(storeName: string, items: any[]): string {
 function calculateSustainabilityScore(items: any[]): number {
   if (items.length === 0) return 50;
   
-  let score = 60; // Base score
+  let totalScore = 0;
   
-  // Boost score for organic, eco-friendly items
-  const ecoKeywords = ['organic', 'eco', 'sustainable', 'green', 'natural', 'biodegradable'];
-  const ecoItems = items.filter(item => 
-    ecoKeywords.some(keyword => item.name.toLowerCase().includes(keyword))
-  );
+  for (const item of items) {
+    const name = item.name.toLowerCase();
+    let itemScore = 50; // Base score
+    
+    // High sustainability items (+30-40 points)
+    if (name.match(/(organic|eco|sustainable|green|natural|biodegradable|fresh|local|farm|vegetable|fruit)/)) {
+      itemScore += 35;
+    }
+    
+    // Medium sustainability items (+10-20 points)
+    else if (name.match(/(whole|grain|natural|unprocessed|water|plant|herb)/)) {
+      itemScore += 15;
+    }
+    
+    // Low sustainability items (-20-30 points)
+    else if (name.match(/(plastic|disposable|synthetic|artificial|processed|packaged|fast|instant|frozen)/)) {
+      itemScore -= 25;
+    }
+    
+    // Very low sustainability items (-30-40 points)
+    else if (name.match(/(styrofoam|single.use|non.recyclable|chemical|preservative)/)) {
+      itemScore -= 35;
+    }
+    
+    // Category-based adjustments
+    if (item.category === 'Groceries') {
+      itemScore += 10; // Fresh food is generally better
+    } else if (item.category === 'Household') {
+      itemScore -= 5; // Cleaning products often have chemicals
+    } else if (item.category === 'Electronics') {
+      itemScore -= 15; // Electronics have environmental impact
+    }
+    
+    // Ensure score is within bounds
+    itemScore = Math.max(0, Math.min(100, itemScore));
+    totalScore += itemScore;
+  }
   
-  score += (ecoItems.length / items.length) * 30;
-  
-  // Reduce score for processed/packaged items
-  const processedKeywords = ['plastic', 'processed', 'artificial', 'synthetic'];
-  const processedItems = items.filter(item => 
-    processedKeywords.some(keyword => item.name.toLowerCase().includes(keyword))
-  );
-  
-  score -= (processedItems.length / items.length) * 20;
-  
-  // Cap score between 0 and 100
-  return Math.max(0, Math.min(100, Math.round(score)));
+  const averageScore = Math.round(totalScore / items.length);
+  return Math.max(0, Math.min(100, averageScore));
 }
