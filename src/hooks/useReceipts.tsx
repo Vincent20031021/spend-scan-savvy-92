@@ -59,24 +59,51 @@ export function useReceipts() {
   }, [user]);
 
   const processReceipt = async (imageBase64: string, fileName?: string) => {
-    if (!session) {
-      throw new Error('Not authenticated');
+    if (!session?.access_token) {
+      throw new Error('Not authenticated - missing session or access token');
+    }
+
+    if (!imageBase64 || imageBase64.trim() === '') {
+      throw new Error('Image data is required');
     }
 
     setProcessing(true);
     
     try {
+      // Validate base64 string before sending
+      try {
+        atob(imageBase64);
+      } catch (e) {
+        throw new Error('Invalid image data format');
+      }
+
+      console.log('Sending request to process-receipt with:', {
+        imageBase64Length: imageBase64.length,
+        fileName: fileName || 'unknown',
+        hasAccessToken: !!session.access_token
+      });
+
       const { data, error } = await supabase.functions.invoke('process-receipt', {
-        body: { imageBase64, fileName },
+        body: JSON.stringify({ 
+          imageBase64: imageBase64.trim(), 
+          fileName: fileName || `receipt-${Date.now()}.jpg`
+        }),
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
         },
       });
 
       if (error) {
-        console.error('Error processing receipt:', error);
-        throw error;
+        console.error('Supabase function error:', error);
+        throw new Error(`Processing failed: ${error.message || 'Unknown error'}`);
       }
+
+      if (!data) {
+        throw new Error('No data returned from processing');
+      }
+
+      console.log('Processing successful:', data);
 
       // Refresh receipts list
       await fetchReceipts();
@@ -84,6 +111,20 @@ export function useReceipts() {
       return data;
     } catch (error) {
       console.error('Error processing receipt:', error);
+      
+      // Provide more specific error messages
+      if (error instanceof Error) {
+        if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+          throw new Error('Authentication failed - please sign in again');
+        } else if (error.message.includes('400') || error.message.includes('Bad Request')) {
+          throw new Error('Invalid image data - please try a different image');
+        } else if (error.message.includes('403') || error.message.includes('Forbidden')) {
+          throw new Error('Access denied - check your permissions');
+        } else if (error.message.includes('timeout')) {
+          throw new Error('Processing timed out - please try again');
+        }
+      }
+      
       throw error;
     } finally {
       setProcessing(false);

@@ -67,15 +67,57 @@ const ReceiptScanner = () => {
 
   const convertFileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        reject(new Error('File must be an image'));
+        return;
+      }
+      
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        reject(new Error('File size must be less than 10MB'));
+        return;
+      }
+
       const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => {
-        const result = reader.result as string;
-        // Remove data:image/jpeg;base64, prefix
-        const base64 = result.split(',')[1];
-        resolve(base64);
+      
+      reader.onload = (event) => {
+        try {
+          const result = event.target?.result as string;
+          if (!result) {
+            reject(new Error('Failed to read file'));
+            return;
+          }
+          
+          // Extract base64 data after the comma
+          const base64Data = result.split(',')[1];
+          if (!base64Data) {
+            reject(new Error('Invalid base64 data'));
+            return;
+          }
+          
+          // Validate base64 string
+          try {
+            atob(base64Data);
+            resolve(base64Data);
+          } catch (e) {
+            reject(new Error('Invalid base64 encoding'));
+          }
+        } catch (error) {
+          reject(error);
+        }
       };
-      reader.onerror = error => reject(error);
+      
+      reader.onerror = () => {
+        reject(new Error('Failed to read file'));
+      };
+      
+      reader.onabort = () => {
+        reject(new Error('File reading was aborted'));
+      };
+      
+      // Read file as data URL
+      reader.readAsDataURL(file);
     });
   };
 
