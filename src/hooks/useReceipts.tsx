@@ -59,8 +59,11 @@ export function useReceipts() {
   }, [user]);
 
   const processReceipt = async (imageBase64: string, fileName?: string) => {
-    if (!session?.access_token) {
-      throw new Error('Not authenticated - missing session or access token');
+    // Get fresh session to ensure we have a valid token
+    const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !currentSession?.access_token) {
+      throw new Error('Not authenticated - please sign in again');
     }
 
     if (!imageBase64 || imageBase64.trim() === '') {
@@ -77,39 +80,38 @@ export function useReceipts() {
         throw new Error('Invalid image data format');
       }
 
-      console.log('Sending request to process-receipt with:', {
-        imageBase64Length: imageBase64.length,
-        fileName: fileName || 'unknown',
-        hasAccessToken: !!session.access_token
-      });
-
       const requestBody = {
         imageBase64: imageBase64.trim(),
         fileName: fileName || `receipt-${Date.now()}.jpg`
       };
 
-      console.log('Request body structure:', {
+      console.log('Sending fetch request with:', {
+        bodyLength: JSON.stringify(requestBody).length,
         imageBase64Length: requestBody.imageBase64.length,
         fileName: requestBody.fileName,
-        bodyKeys: Object.keys(requestBody)
+        hasAccessToken: !!currentSession.access_token
       });
 
-      const { data, error } = await supabase.functions.invoke('process-receipt', {
-        body: requestBody,
+      // Use native fetch with all required headers
+      const response = await fetch('https://qjzrmjbavocerdswrkyb.supabase.co/functions/v1/process-receipt', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentSession.access_token}`,
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqenJtamJhdm9jZXJkc3dya3liIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY2MjI2OTcsImV4cCI6MjA3MjE5ODY5N30.WGIfJwPS-LWZyKXmu07hjh65HzcQVcx_w_pXV4cC1Aw'
         },
+        body: JSON.stringify(requestBody)
       });
 
-      if (error) {
-        console.error('Supabase function error:', error);
-        throw new Error(`Processing failed: ${error.message || 'Unknown error'}`);
+      console.log('Response status:', response.status, response.statusText);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('HTTP error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
-      if (!data) {
-        throw new Error('No data returned from processing');
-      }
-
+      const data = await response.json();
       console.log('Processing successful:', data);
 
       // Refresh receipts list
