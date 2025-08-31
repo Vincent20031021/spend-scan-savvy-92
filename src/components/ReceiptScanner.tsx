@@ -7,6 +7,7 @@ import { Camera, Upload, Scan, Receipt, TrendingUp, Leaf, LogOut, User } from "l
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useReceipts } from "@/hooks/useReceipts";
+import ReceiptDetailModal from "./ReceiptDetailModal";
 
 const ReceiptScanner = () => {
   const { user, signOut } = useAuth();
@@ -20,6 +21,8 @@ const ReceiptScanner = () => {
   } = useReceipts();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
 
   // Redirect to auth if not logged in
   if (!user) {
@@ -112,6 +115,11 @@ const ReceiptScanner = () => {
     if (file) {
       handleFileUpload(file);
     }
+  };
+
+  const handleReceiptClick = (receipt: any) => {
+    setSelectedReceipt(receipt);
+    setDetailModalOpen(true);
   };
 
   const totalSpending = calculateTotalSpending('week');
@@ -242,8 +250,9 @@ const ReceiptScanner = () => {
               receipts.map((receipt, index) => (
                 <div 
                   key={receipt.id} 
-                  className="flex items-center justify-between p-4 bg-muted/50 rounded-lg hover:bg-muted/70 transition-all duration-200 hover:scale-[1.02] animate-fade-in"
+                  className="flex items-center justify-between p-4 bg-muted/50 rounded-lg hover:bg-muted/70 transition-all duration-200 hover:scale-[1.02] animate-fade-in cursor-pointer"
                   style={{ animationDelay: `${index * 100}ms` }}
+                  onClick={() => handleReceiptClick(receipt)}
                 >
                   <div className="flex-1">
                     <div className="font-semibold text-foreground">{receipt.store_name}</div>
@@ -280,6 +289,16 @@ const ReceiptScanner = () => {
             </Button>
           </div>
         </div>
+
+        {/* Receipt Detail Modal */}
+        <ReceiptDetailModal 
+          receipt={selectedReceipt}
+          isOpen={detailModalOpen}
+          onClose={() => {
+            setDetailModalOpen(false);
+            setSelectedReceipt(null);
+          }}
+        />
       </div>
     </div>
   );

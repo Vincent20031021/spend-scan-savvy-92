@@ -172,61 +172,137 @@ serve(async (req) => {
 function parseReceiptText(text: string) {
   const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
   
+  console.log('Parsing receipt text, total lines:', lines.length);
+  
   // Extract store name (usually first few lines)
-  const storeName = lines.slice(0, 3).find(line => 
+  const storeName = lines.slice(0, 5).find(line => 
     !line.match(/^\d/) && 
     line.length > 2 && 
-    !line.toLowerCase().includes('receipt')
+    !line.toLowerCase().includes('receipt') &&
+    !line.match(/^[\d\W]+$/) // Not just numbers and special chars
   ) || 'Unknown Store';
 
-  // Extract total amount
-  const totalRegex = /(?:total|amount|sum).*?[\$]?(\d+\.?\d*)/gi;
+  console.log('Extracted store name:', storeName);
+
+  // Extract total amount - improved regex patterns
+  const totalPatterns = [
+    /total[:\s]+\$?([\d,]+\.?\d*)/i,
+    /amount[:\s]+\$?([\d,]+\.?\d*)/i,
+    /sum[:\s]+\$?([\d,]+\.?\d*)/i,
+    /grand\s+total[:\s]+\$?([\d,]+\.?\d*)/i,
+    /balance[:\s]+\$?([\d,]+\.?\d*)/i,
+    /\$?([\d,]+\.\d{2})(?:\s|$)/  // Any dollar amount with 2 decimals
+  ];
+  
   let totalAmount = 0;
-  for (const line of lines) {
-    const match = line.match(totalRegex);
-    if (match) {
-      const amount = parseFloat(match[0].replace(/[^\d.]/g, ''));
-      if (amount > totalAmount) {
-        totalAmount = amount;
+  for (const line of lines.slice(-10)) { // Check last 10 lines for total
+    for (const pattern of totalPatterns) {
+      const match = line.match(pattern);
+      if (match) {
+        const amount = parseFloat(match[1].replace(/,/g, ''));
+        if (amount > totalAmount && amount < 10000) { // Sanity check
+          totalAmount = amount;
+        }
       }
     }
   }
 
-  // Extract date
-  const dateRegex = /\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/;
-  const dateMatch = text.match(dateRegex);
-  const date = dateMatch ? new Date(dateMatch[0]).toISOString().split('T')[0] : null;
+  console.log('Extracted total amount:', totalAmount);
 
-  // Extract items (lines with prices)
+  // Extract date - improved patterns
+  const datePatterns = [
+    /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/,
+    /(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/,
+    /(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}/i
+  ];
+  
+  let date = null;
+  for (const pattern of datePatterns) {
+    const dateMatch = text.match(pattern);
+    if (dateMatch) {
+      try {
+        const parsedDate = new Date(dateMatch[0]);
+        if (!isNaN(parsedDate.getTime())) {
+          date = parsedDate.toISOString().split('T')[0];
+          break;
+        }
+      } catch (e) {
+        console.log('Date parsing error:', e);
+      }
+    }
+  }
+  
+  if (!date) {
+    date = new Date().toISOString().split('T')[0];
+  }
+
+  console.log('Extracted date:', date);
+
+  // Extract items - improved patterns
   const items = [];
-  const itemRegex = /(.+?)[\s\t]+\$?(\d+\.?\d*)/;
+  const itemPatterns = [
+    /^(.+?)\s+\$?([\d,]+\.?\d{0,2})$/,  // Item name followed by price
+    /^(.+?)\s{2,}\$?([\d,]+\.?\d{0,2})$/,  // With multiple spaces
+    /^(.+?)\t+\$?([\d,]+\.?\d{0,2})$/,  // With tabs
+    /^([\w\s]+)\s+(\d+)\s+@\s+\$?([\d,]+\.?\d{0,2})/,  // With quantity format
+  ];
   
   for (const line of lines) {
-    const match = line.match(itemRegex);
-    if (match && !line.toLowerCase().includes('total') && !line.toLowerCase().includes('tax')) {
-      const price = parseFloat(match[2]);
-      if (price > 0 && price < totalAmount) {
-        items.push({
-          name: match[1].trim(),
-          price: price,
-          category: categorizeItem(match[1].trim()),
-          quantity: 1
-        });
+    // Skip lines that are likely headers or totals
+    if (line.toLowerCase().match(/(total|tax|subtotal|balance|change|payment|cash|credit|debit)/)) {
+      continue;
+    }
+    
+    for (const pattern of itemPatterns) {
+      const match = line.match(pattern);
+      if (match) {
+        let price = 0;
+        let name = '';
+        
+        if (match.length === 3) {
+          name = match[1].trim();
+          price = parseFloat(match[2].replace(/,/g, ''));
+        } else if (match.length === 4) {
+          // Quantity format
+          name = match[1].trim();
+          const qty = parseInt(match[2]);
+          const unitPrice = parseFloat(match[3].replace(/,/g, ''));
+          price = qty * unitPrice;
+        }
+        
+        // Validate item
+        if (name.length > 2 && price > 0 && price < (totalAmount || 1000)) {
+          items.push({
+            name: name.substring(0, 100), // Limit name length
+            price: price,
+            category: categorizeItem(name),
+            quantity: 1
+          });
+          break; // Found a match, move to next line
+        }
       }
     }
   }
+
+  console.log('Extracted items:', items.length);
 
   // Determine category based on store or items
   const category = determineReceiptCategory(storeName, items);
 
+  // If we didn't find a total but have items, sum them up
+  if (totalAmount === 0 && items.length > 0) {
+    totalAmount = items.reduce((sum, item) => sum + item.price, 0);
+    console.log('Calculated total from items:', totalAmount);
+  }
+
   return {
-    storeName: storeName.replace(/[^a-zA-Z0-9\s]/g, '').trim(),
-    totalAmount,
+    storeName: storeName.replace(/[^a-zA-Z0-9\s&'-]/g, '').trim().substring(0, 100),
+    totalAmount: Math.round(totalAmount * 100) / 100, // Round to 2 decimals
     date,
     items,
     category,
     currency: 'USD',
-    rawText: text
+    rawText: text.substring(0, 5000) // Limit raw text size
   };
 }
 
