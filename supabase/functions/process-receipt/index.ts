@@ -173,70 +173,160 @@ function parseReceiptText(text: string) {
   const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
   
   console.log('Parsing receipt text, total lines:', lines.length);
+  console.log('First 10 lines:', lines.slice(0, 10));
+  console.log('Last 10 lines:', lines.slice(-10));
   
-  // Extract store name (usually first few lines)
-  const storeName = lines.slice(0, 5).find(line => 
-    !line.match(/^\d/) && 
-    line.length > 2 && 
-    !line.toLowerCase().includes('receipt') &&
-    !line.match(/^[\d\W]+$/) // Not just numbers and special chars
-  ) || 'Unknown Store';
+  // Extract store name - improved detection
+  let storeName = 'Unknown Store';
+  
+  // Known store patterns
+  const storePatterns = [
+    /walmart/i, /target/i, /whole\s*foods/i, /kroger/i, /safeway/i,
+    /cvs/i, /walgreens/i, /starbucks/i, /mcdonald/i, /subway/i,
+    /best\s*buy/i, /home\s*depot/i, /costco/i, /trader\s*joe/i,
+    /amazon/i, /apple\s*store/i, /macy/i, /nordstrom/i
+  ];
+  
+  // Check for known stores first
+  for (const pattern of storePatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      storeName = match[0].charAt(0).toUpperCase() + match[0].slice(1).toLowerCase();
+      break;
+    }
+  }
+  
+  // If no known store found, try to extract from first few lines
+  if (storeName === 'Unknown Store') {
+    for (let i = 0; i < Math.min(5, lines.length); i++) {
+      const line = lines[i];
+      // Skip lines that are clearly not store names
+      if (!line.match(/^\d/) && // Doesn't start with number
+          line.length > 2 && line.length < 50 && // Reasonable length
+          !line.toLowerCase().includes('receipt') &&
+          !line.toLowerCase().includes('tax') &&
+          !line.toLowerCase().includes('total') &&
+          !line.match(/^[\d\W]+$/) && // Not just numbers and special chars
+          !line.match(/^\$/) // Doesn't start with $
+      ) {
+        storeName = line.replace(/[^a-zA-Z0-9\s&'-]/g, '').trim();
+        if (storeName.length > 2) {
+          break;
+        }
+      }
+    }
+  }
 
   console.log('Extracted store name:', storeName);
 
-  // Extract total amount - improved regex patterns
+  // Extract total amount - comprehensive patterns
   const totalPatterns = [
-    /total[:\s]+\$?([\d,]+\.?\d*)/i,
-    /amount[:\s]+\$?([\d,]+\.?\d*)/i,
-    /sum[:\s]+\$?([\d,]+\.?\d*)/i,
-    /grand\s+total[:\s]+\$?([\d,]+\.?\d*)/i,
-    /balance[:\s]+\$?([\d,]+\.?\d*)/i,
-    /\$?([\d,]+\.\d{2})(?:\s|$)/  // Any dollar amount with 2 decimals
+    /(?:grand\s+)?total[:\s]+\$?([\d,]+\.?\d*)/i,
+    /amount\s+due[:\s]+\$?([\d,]+\.?\d*)/i,
+    /balance\s+due[:\s]+\$?([\d,]+\.?\d*)/i,
+    /(?:sub)?total[:\s]+\$?([\d,]+\.?\d*)/i,
+    /you\s+pay[:\s]+\$?([\d,]+\.?\d*)/i,
+    /charge[:\s]+\$?([\d,]+\.?\d*)/i,
+    /paid[:\s]+\$?([\d,]+\.?\d*)/i,
+    /\$\s*([\d,]+\.\d{2})(?:\s|$)/,  // Any clear dollar amount
+    /^([\d,]+\.\d{2})(?:\s|$)/m  // Amount at start of line
   ];
   
   let totalAmount = 0;
-  for (const line of lines.slice(-10)) { // Check last 10 lines for total
+  let foundAmounts = [];
+  
+  // Look through all lines for amounts, prioritizing bottom of receipt
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
     for (const pattern of totalPatterns) {
       const match = line.match(pattern);
       if (match) {
         const amount = parseFloat(match[1].replace(/,/g, ''));
-        if (amount > totalAmount && amount < 10000) { // Sanity check
-          totalAmount = amount;
+        if (amount > 0 && amount < 10000) { // Sanity check
+          foundAmounts.push({ amount, line, index: i });
+          // If it's explicitly labeled as total, use it
+          if (line.toLowerCase().includes('total') && !line.toLowerCase().includes('sub')) {
+            totalAmount = amount;
+            break;
+          }
         }
       }
     }
+    if (totalAmount > 0) break;
+  }
+  
+  // If no explicit total found, use the largest reasonable amount from bottom half
+  if (totalAmount === 0 && foundAmounts.length > 0) {
+    // Sort by position (prefer amounts closer to bottom) and amount
+    foundAmounts.sort((a, b) => {
+      // Prefer amounts from bottom third of receipt
+      const bottomThird = lines.length * 0.66;
+      if (a.index >= bottomThird && b.index < bottomThird) return -1;
+      if (b.index >= bottomThird && a.index < bottomThird) return 1;
+      // Otherwise prefer larger amount
+      return b.amount - a.amount;
+    });
+    totalAmount = foundAmounts[0].amount;
   }
 
+  console.log('Found amounts:', foundAmounts);
   console.log('Extracted total amount:', totalAmount);
 
-  // Extract date - improved patterns
+  // Extract date - comprehensive patterns
   const datePatterns = [
-    /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/,
-    /(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/,
-    /(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}/i
+    /(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/,
+    /(\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2})/,
+    /(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[\s,]+\d{1,2}[\s,]+\d{2,4}/i,
+    /(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{2,4})/i,
+    /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2})(?:\s|$)/  // Short year format
   ];
   
   let date = null;
+  
+  // Look for date patterns
   for (const pattern of datePatterns) {
-    const dateMatch = text.match(pattern);
-    if (dateMatch) {
-      try {
-        const parsedDate = new Date(dateMatch[0]);
-        if (!isNaN(parsedDate.getTime())) {
-          date = parsedDate.toISOString().split('T')[0];
-          break;
+    const matches = text.match(new RegExp(pattern, 'g'));
+    if (matches) {
+      for (const match of matches) {
+        try {
+          let dateStr = match;
+          
+          // Handle short year format (MM/DD/YY)
+          if (dateStr.match(/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2}$/)) {
+            const parts = dateStr.split(/[\/\-]/);
+            const year = parseInt(parts[2]);
+            // Assume 20xx for years 00-30, 19xx for years 31-99
+            const fullYear = year <= 30 ? 2000 + year : 1900 + year;
+            dateStr = `${parts[0]}/${parts[1]}/${fullYear}`;
+          }
+          
+          const parsedDate = new Date(dateStr);
+          
+          // Validate the date is reasonable (not in future, not too old)
+          const now = new Date();
+          const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+          
+          if (!isNaN(parsedDate.getTime()) && 
+              parsedDate <= now && 
+              parsedDate >= oneYearAgo) {
+            date = parsedDate.toISOString().split('T')[0];
+            break;
+          }
+        } catch (e) {
+          console.log('Date parsing error for:', match, e);
         }
-      } catch (e) {
-        console.log('Date parsing error:', e);
       }
+      if (date) break;
     }
   }
   
+  // Default to today if no date found
   if (!date) {
     date = new Date().toISOString().split('T')[0];
+    console.log('No date found, using today:', date);
+  } else {
+    console.log('Extracted date:', date);
   }
-
-  console.log('Extracted date:', date);
 
   // Extract items - improved patterns
   const items = [];

@@ -255,23 +255,33 @@ const ReceiptScanner = () => {
                   onClick={() => handleReceiptClick(receipt)}
                 >
                   <div className="flex-1">
-                    <div className="font-semibold text-foreground">{receipt.store_name}</div>
+                    <div className="font-semibold text-foreground">
+                      {receipt.store_name || 'Unknown Store'}
+                      {!receipt.store_name && (
+                        <span className="text-xs text-amber-600 dark:text-amber-400 ml-2">⚠️</span>
+                      )}
+                    </div>
                     <div className="text-sm text-muted-foreground">
                       {formatDate(receipt.created_at)}
                     </div>
                     <div className="flex items-center gap-2 mt-1">
                       <Leaf className="w-3 h-3" />
                       <span className={`text-xs font-medium ${getSustainabilityColor(parseInt(receipt.sustainability_score || '0'))}`}>
-                        Eco Score: {getSustainabilityGrade(parseInt(receipt.sustainability_score || '0'))} ({receipt.sustainability_score}%)
+                        Eco Score: {getSustainabilityGrade(parseInt(receipt.sustainability_score || '0'))} ({receipt.sustainability_score || '0'}%)
                       </span>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-bold text-lg">${receipt.total_amount?.toFixed(2) || '0.00'}</div>
+                    <div className="font-bold text-lg">
+                      ${receipt.total_amount ? receipt.total_amount.toFixed(2) : '0.00'}
+                      {(!receipt.total_amount || receipt.total_amount === 0) && (
+                        <span className="text-xs text-amber-600 dark:text-amber-400 ml-1">⚠️</span>
+                      )}
+                    </div>
                     <Badge 
                       className={`text-xs text-white ${categoryColors[receipt.category as keyof typeof categoryColors] || 'bg-secondary'}`}
                     >
-                      {receipt.category}
+                      {receipt.category || 'Other'}
                     </Badge>
                   </div>
                 </div>
