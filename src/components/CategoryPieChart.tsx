@@ -62,24 +62,24 @@ export const CategoryPieChart = () => {
         label: 'Items by Category',
         data: categoryData.map(item => item.item_count),
         backgroundColor: [
-          '#FF6384',
-          '#36A2EB',
-          '#FFCE56',
-          '#4BC0C0',
-          '#9966FF',
-          '#FF9F40',
-          '#FF6384',
-          '#C9CBCF'
+          'hsl(142, 76%, 45%)',     // Primary mint green
+          'hsl(142, 60%, 55%)',     // Lighter mint
+          'hsl(142, 50%, 35%)',     // Darker mint
+          'hsl(142, 70%, 65%)',     // Very light mint
+          'hsl(142, 40%, 40%)',     // Deep mint
+          'hsl(142, 80%, 50%)',     // Bright mint
+          'hsl(142, 30%, 45%)',     // Muted mint
+          'hsl(142, 90%, 40%)'      // Vibrant mint
         ],
         borderColor: [
-          '#FF6384',
-          '#36A2EB',
-          '#FFCE56',
-          '#4BC0C0',
-          '#9966FF',
-          '#FF9F40',
-          '#FF6384',
-          '#C9CBCF'
+          'hsl(142, 76%, 36%)',     // Darker border
+          'hsl(142, 60%, 45%)',     
+          'hsl(142, 50%, 25%)',     
+          'hsl(142, 70%, 55%)',     
+          'hsl(142, 40%, 30%)',     
+          'hsl(142, 80%, 40%)',     
+          'hsl(142, 30%, 35%)',     
+          'hsl(142, 90%, 30%)'      
         ],
         borderWidth: 2,
       },

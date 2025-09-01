@@ -130,7 +130,10 @@ serve(async (req) => {
               type: 'DOCUMENT_TEXT_DETECTION',
               maxResults: 1 
             }
-          ]
+          ],
+          imageContext: {
+            languageHints: ['en']
+          }
         }]
       };
       
@@ -182,11 +185,14 @@ serve(async (req) => {
       
       if (visionData.responses && visionData.responses[0] && visionData.responses[0].textAnnotations) {
         const fullText = visionData.responses[0].textAnnotations[0]?.description || '';
+        const textAnnotations = visionData.responses[0].textAnnotations || [];
         console.log('Extracted raw text length:', fullText.length);
         console.log('First 500 chars:', fullText.substring(0, 500));
+        console.log('Total text annotations:', textAnnotations.length);
         
         if (fullText.trim()) {
-          extractedData = parseReceiptText(fullText);
+          // Use enhanced parsing with bounding box analysis
+          extractedData = parseReceiptTextWithBoundingBoxes(fullText, textAnnotations);
           console.log('Parsed data:', JSON.stringify(extractedData, null, 2));
         } else {
           console.log('No text extracted from image');
@@ -230,7 +236,7 @@ serve(async (req) => {
       purchase_date: extractedData?.date || new Date().toISOString().split('T')[0],
       currency: extractedData?.currency || 'USD',
       category: extractedData?.category || 'Other',
-      sustainability_score: calculateSustainabilityScore(extractedData?.items || []).toString(),
+      sustainability_score: calculateEnhancedSustainabilityScore(extractedData?.items || [], extractedData?.storeName || '').toString(),
       image_url: publicUrl,
       raw_text: extractedData?.rawText || ''
     };
@@ -347,6 +353,182 @@ serve(async (req) => {
     });
   }
 });
+
+// Enhanced parsing function using bounding box analysis
+function parseReceiptTextWithBoundingBoxes(text: string, textAnnotations: any[]) {
+  console.log('[Enhanced Parser] Starting enhanced parsing with bounding boxes');
+  
+  // First get basic info using original method
+  const basicData = parseReceiptText(text);
+  
+  // Now enhance with spatial analysis for better item extraction
+  const enhancedItems = extractItemsWithSpatialAnalysis(textAnnotations);
+  
+  return {
+    ...basicData,
+    items: enhancedItems.length > 0 ? enhancedItems : basicData.items
+  };
+}
+
+// Spatial analysis for item extraction using bounding boxes
+function extractItemsWithSpatialAnalysis(textAnnotations: any[]) {
+  if (!textAnnotations || textAnnotations.length < 2) {
+    console.log('[Spatial Analysis] Insufficient text annotations for spatial analysis');
+    return [];
+  }
+
+  console.log('[Spatial Analysis] Processing', textAnnotations.length, 'text annotations');
+  
+  // Skip the first annotation (full text) and process individual words/phrases
+  const wordAnnotations = textAnnotations.slice(1);
+  
+  // Group annotations by approximate Y position (same line)
+  const lines: any[] = [];
+  const yTolerance = 10; // pixels tolerance for same line
+  
+  wordAnnotations.forEach(annotation => {
+    if (!annotation.boundingPoly?.vertices) return;
+    
+    const text = annotation.description?.trim();
+    if (!text || text.length === 0) return;
+    
+    const avgY = annotation.boundingPoly.vertices.reduce((sum: number, v: any) => sum + (v.y || 0), 0) / 4;
+    const avgX = annotation.boundingPoly.vertices.reduce((sum: number, v: any) => sum + (v.x || 0), 0) / 4;
+    
+    // Find existing line or create new one
+    let matchingLine = lines.find(line => Math.abs(line.avgY - avgY) <= yTolerance);
+    
+    if (!matchingLine) {
+      matchingLine = { avgY, words: [] };
+      lines.push(matchingLine);
+    }
+    
+    matchingLine.words.push({
+      text,
+      x: avgX,
+      y: avgY,
+      boundingPoly: annotation.boundingPoly
+    });
+  });
+
+  // Sort lines by Y position (top to bottom)
+  lines.sort((a, b) => a.avgY - b.avgY);
+  
+  // Sort words in each line by X position (left to right)
+  lines.forEach(line => {
+    line.words.sort((a: any, b: any) => a.x - b.x);
+    line.fullText = line.words.map((w: any) => w.text).join(' ');
+  });
+
+  console.log('[Spatial Analysis] Found', lines.length, 'text lines');
+  
+  // Extract items using enhanced patterns
+  const items: any[] = [];
+  const pricePattern = /^\$?(\d+\.?\d*)$/;
+  const quantityPattern = /^(\d+)x?$/i;
+  
+  lines.forEach((line, index) => {
+    const words = line.words;
+    const fullText = line.fullText;
+    
+    // Skip obvious non-item lines
+    if (shouldSkipLine(fullText)) return;
+    
+    // Look for price patterns in this line
+    const priceWords = words.filter((word: any) => pricePattern.test(word.text.replace(/[,$]/g, '')));
+    
+    if (priceWords.length > 0) {
+      // Found potential item line with price
+      const price = parseFloat(priceWords[0].text.replace(/[^0-9.]/g, ''));
+      
+      if (price > 0 && price < 1000) { // Sanity check
+        // Extract item name (words before the price)
+        const priceIndex = words.findIndex((w: any) => w === priceWords[0]);
+        const itemWords = words.slice(0, priceIndex);
+        
+        if (itemWords.length > 0) {
+          const itemName = itemWords.map((w: any) => w.text).join(' ').trim();
+          
+          // Look for quantity
+          let quantity = 1;
+          const qtyMatch = fullText.match(/(\d+)\s*x\s/i);
+          if (qtyMatch) {
+            quantity = parseInt(qtyMatch[1]);
+          }
+          
+          if (itemName.length > 2 && !isCommonNonItem(itemName)) {
+            const category = categorizeItem(itemName);
+            items.push({
+              name: itemName,
+              price: price,
+              quantity: quantity,
+              category: category,
+              confidence: calculateItemConfidence(itemName, price, line.words)
+            });
+            
+            console.log('[Item Debug] SUCCESSFULLY ADDED spatial analysis item:', 
+              'Name:', JSON.stringify(itemName), 
+              'Price:', price,
+              'Category:', category
+            );
+          }
+        }
+      }
+    }
+  });
+
+  // Sort by confidence and return top items
+  return items
+    .sort((a, b) => b.confidence - a.confidence)
+    .slice(0, 20); // Limit to 20 items max
+}
+
+// Helper function to skip obvious non-item lines
+function shouldSkipLine(text: string): boolean {
+  const skipPatterns = [
+    /^[\d\s\-\/]+$/, // Just numbers/dates/dashes
+    /store|receipt|thank|you|visit|again|cashier|register/i,
+    /subtotal|tax|total|balance|change|tender|payment/i,
+    /phone|address|www\.|\.com|email/i,
+    /^[\$\d\.\s\-]+$/ // Just prices and spaces
+  ];
+  
+  return skipPatterns.some(pattern => pattern.test(text.trim()));
+}
+
+// Calculate confidence score for extracted items
+function calculateItemConfidence(itemName: string, price: number, words: any[]): number {
+  let confidence = 0.5; // Base confidence
+  
+  // Boost confidence for reasonable item names
+  if (itemName.length >= 3 && itemName.length <= 50) confidence += 0.2;
+  if (/^[a-zA-Z]/.test(itemName)) confidence += 0.1; // Starts with letter
+  if (!/^\d+$/.test(itemName)) confidence += 0.1; // Not just numbers
+  
+  // Boost confidence for reasonable prices
+  if (price >= 0.50 && price <= 100) confidence += 0.2;
+  
+  // Boost confidence for common product words
+  const productWords = ['milk', 'bread', 'cheese', 'apple', 'banana', 'chicken', 'beef', 'rice', 'pasta'];
+  if (productWords.some(word => itemName.toLowerCase().includes(word))) {
+    confidence += 0.3;
+  }
+  
+  return Math.min(confidence, 1.0);
+}
+
+// Helper function to identify common non-item text
+function isCommonNonItem(itemName: string): boolean {
+  const nonItemPatterns = [
+    /^(total|subtotal|tax|balance|change|payment|cash|credit|debit|receipt|thank|you|store|address|phone|date|time|served|by|register|cashier)$/i,
+    /^\d+$/, // Just numbers
+    /^[\d\s\-\/]+$/, // Just numbers/dates/dashes
+    /^[#*\-=]+$/, // Just symbols
+    /^(www\.|\.com|email|phone|address)/i
+  ];
+  
+  return nonItemPatterns.some(pattern => pattern.test(itemName.trim()));
+}
 
 function parseReceiptText(text: string) {
   const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
@@ -758,6 +940,130 @@ function determineReceiptCategory(storeName: string, items: any[]): string {
   }
   
   return 'Other';
+}
+
+// Enhanced sustainability scoring using LCA methodology
+function calculateEnhancedSustainabilityScore(items: any[], storeName: string): number {
+  if (!items || items.length === 0) return 50; // Neutral score for no items
+  
+  console.log('[Eco Score] Calculating enhanced sustainability score for', items.length, 'items');
+  
+  let totalScore = 0;
+  let totalWeight = 0;
+  
+  items.forEach(item => {
+    const itemName = (item.name || '').toLowerCase();
+    const price = item.price || 0;
+    const category = item.category || 'Other';
+    
+    // Base LCA score by category (based on environmental impact studies)
+    let baseScore = getLCAScoreByCategory(category);
+    
+    // Product-specific adjustments
+    baseScore += getProductSpecificScore(itemName);
+    
+    // Organic/sustainable product bonuses
+    baseScore += getOrganicBonus(itemName);
+    
+    // Packaging penalty/bonus
+    baseScore += getPackagingScore(itemName);
+    
+    // Store-specific adjustments (some stores focus on sustainability)
+    baseScore += getStoreBonus(storeName);
+    
+    // Price-based adjustment (sometimes correlates with quality/sustainability)
+    baseScore += getPriceBasedAdjustment(price, category);
+    
+    // Weight by price (more expensive items have more impact on overall score)
+    const weight = Math.max(price, 1);
+    totalScore += baseScore * weight;
+    totalWeight += weight;
+    
+    console.log('[Eco Score] Item:', itemName, 'Category:', category, 'Score:', baseScore, 'Weight:', weight);
+  });
+  
+  const finalScore = totalWeight > 0 ? Math.round(totalScore / totalWeight) : 50;
+  const boundedScore = Math.max(10, Math.min(90, finalScore)); // Keep within 10-90 range
+  
+  console.log('[Eco Score] Final enhanced score:', boundedScore);
+  return boundedScore;
+}
+
+// LCA base scores by category (lower = better environmental impact)
+function getLCAScoreByCategory(category: string): number {
+  const categoryScores: { [key: string]: number } = {
+    'Groceries': 65,      // Mixed impact, depends on specific products
+    'Personal Care': 55,   // Generally moderate impact
+    'Household': 45,       // Cleaning products can be harsh
+    'Electronics': 25,     // High environmental impact
+    'Clothing': 35,        // Fashion industry has significant impact
+    'Dining': 50,          // Varies greatly
+    'Other': 50
+  };
+  
+  return categoryScores[category] || 50;
+}
+
+// Product-specific scoring based on environmental impact
+function getProductSpecificScore(itemName: string): number {
+  // High environmental impact products (penalty)
+  if (/(beef|steak|lamb|meat)/i.test(itemName)) return -15;
+  if (/(plastic|disposable)/i.test(itemName)) return -10;
+  if (/(battery|electronics)/i.test(itemName)) return -12;
+  
+  // Low environmental impact products (bonus)
+  if (/(vegetable|fruit|plant|grain|bean|lentil)/i.test(itemName)) return +10;
+  if (/(bicycle|bike|walk)/i.test(itemName)) return +15;
+  if (/(solar|renewable|eco|green)/i.test(itemName)) return +20;
+  
+  // Neutral products
+  return 0;
+}
+
+// Organic and sustainability certifications bonus
+function getOrganicBonus(itemName: string): number {
+  if (/(organic|bio|natural|sustainable|eco|green|fair.trade|rainforest.alliance)/i.test(itemName)) {
+    return +15;
+  }
+  if (/(local|farm|fresh)/i.test(itemName)) {
+    return +8;
+  }
+  return 0;
+}
+
+// Packaging impact scoring
+function getPackagingScore(itemName: string): number {
+  // Excessive packaging penalty
+  if (/(wrapped|packaged|individual|single.use)/i.test(itemName)) return -5;
+  
+  // Minimal/recyclable packaging bonus
+  if (/(bulk|loose|recyclable|biodegradable|compostable)/i.test(itemName)) return +5;
+  
+  return 0;
+}
+
+// Store-specific sustainability bonus
+function getStoreBonus(storeName: string): number {
+  const sustainableStores = [
+    'whole foods', 'trader joe', 'sprouts', 'fresh market', 
+    'co-op', 'farmers market', 'natural grocers'
+  ];
+  
+  const store = storeName.toLowerCase();
+  if (sustainableStores.some(s => store.includes(s))) {
+    return +5;
+  }
+  
+  return 0;
+}
+
+// Price-based sustainability correlation
+function getPriceBasedAdjustment(price: number, category: string): number {
+  // For certain categories, higher price often correlates with better quality/sustainability
+  if (category === 'Groceries' && price > 10) return +3;
+  if (category === 'Personal Care' && price > 15) return +2;
+  
+  return 0;
 }
 
 function calculateSustainabilityScore(items: any[]): number {
