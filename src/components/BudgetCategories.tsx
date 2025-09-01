@@ -44,7 +44,7 @@ const BudgetCategories = ({ totalSpent, receipts }: BudgetCategoriesProps) => {
     <Card className="bg-card shadow-soft border-border/50">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">Budget Category</CardTitle>
+          <CardTitle className="text-lg">Category Breakdown</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

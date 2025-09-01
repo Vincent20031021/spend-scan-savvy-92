@@ -190,7 +190,7 @@ const ReceiptScanner = () => {
             <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
               <Receipt className="w-5 h-5 text-primary" />
             </div>
-            <h1 className="text-xl font-semibold text-foreground">Budget Tracker</h1>
+            <h1 className="text-xl font-semibold text-foreground">Receipt Scanner</h1>
           </div>
           
           <div className="flex items-center gap-2">
@@ -234,7 +234,7 @@ const ReceiptScanner = () => {
         <Card className="bg-card shadow-soft border-border/50 mb-6">
           <CardContent className="p-4">
             <div className="flex justify-between items-center mb-2">
-              <div className="text-lg font-semibold">Budget Progress</div>
+              <div className="text-lg font-semibold">Spending Overview</div>
               <div className="text-lg font-bold text-primary">$1,000.00</div>
             </div>
             <div className="w-full bg-muted rounded-full h-3 mb-2">
