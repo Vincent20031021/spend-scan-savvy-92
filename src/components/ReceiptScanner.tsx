@@ -122,9 +122,16 @@ const ReceiptScanner = () => {
   };
 
   const handleFileUpload = async (file: File) => {
+    console.log('Starting file upload for:', file.name, 'Type:', file.type, 'Size:', file.size);
+    
     try {
+      console.log('Converting file to base64...');
       const base64 = await convertFileToBase64(file);
+      console.log('Base64 conversion successful, length:', base64.length);
+      
+      console.log('Calling processReceipt...');
       const result = await processReceipt(base64, file.name);
+      console.log('processReceipt completed successfully:', result);
       
       toast({
         title: "Receipt processed! 🎉",
@@ -134,7 +141,7 @@ const ReceiptScanner = () => {
       console.error('Error processing receipt:', error);
       toast({
         title: "Processing failed",
-        description: "There was an error processing your receipt. Please try again.",
+        description: error instanceof Error ? error.message : "There was an error processing your receipt. Please try again.",
         variant: "destructive"
       });
     }
@@ -149,13 +156,18 @@ const ReceiptScanner = () => {
   };
 
   const handleUploadReceipt = () => {
+    console.log('Upload button clicked, file input ref:', fileInputRef.current);
     fileInputRef.current?.click();
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('File input changed, files:', event.target.files);
     const file = event.target.files?.[0];
     if (file) {
+      console.log('File selected:', file.name, file.type, file.size);
       handleFileUpload(file);
+    } else {
+      console.log('No file selected');
     }
   };
 
