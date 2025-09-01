@@ -472,20 +472,20 @@ function parseReceiptText(text: string) {
   ];
   
   const itemPatterns = [
-    // Format: "MANGO KENSINGTON PRIDE 200 2.90" (item name with embedded price at end)
-    /^([A-Z\s\*\-'&\.0-9]+?)\s+([\d,]+\.\d{1,2})$/,
-    // Format: "Item name    $12.99" (with dollar sign)
-    /^(.+?)\s+\$\s*([\d,]+\.\d{1,2})$/,
-    // Format: "Item name     12.99" (spaces before price)
-    /^(.+?)\s{2,}([\d,]+\.\d{1,2})$/,
-    // Format: "Item name	12.99" (tab before price)
-    /^(.+?)\t+([\d,]+\.\d{1,2})$/,
-    // Quantity format: "Item 2 @ $3.99"
-    /^([\w\s\-'&\.]+)\s+(\d+)\s*@\s*\$?([\d,]+\.\d{1,2})/,
-    // Quantity format: "Item 2 x $3.99"
-    /^([\w\s\-'&\.]+)\s+(\d+)\s*x\s*\$?([\d,]+\.\d{1,2})/i,
-    // Just numbers at end: "Item Name 4.99"
-    /^(.+?)\s+([\d,]+\.\d{1,2})\s*$/,
+    // Quantity format: "2 @ $3.25 EACH" or "Item 2 @ $3.99"
+    /^(.+?)\s+(\d+)\s*@\s*\$?([\d,]+\.\d{1,2})/,
+    // Quantity format: "Item 2 x $3.99" or "2 x Item Name $3.99"
+    /^(.+?)\s+(\d+)\s*x\s*\$?([\d,]+\.\d{1,2})/i,
+    // Format: "ITEM NAME $12.99" (with dollar sign)
+    /^([A-Z][A-Z\s\*\-'&\.0-9]+?)\s+\$\s*([\d,]+\.\d{1,2})$/,
+    // Format: "ITEM NAME    12.99" (multiple spaces before price, item starts with letter)
+    /^([A-Z][A-Z\s\*\-'&\.0-9]+?)\s{2,}([\d,]+\.\d{1,2})$/,
+    // Format: "ITEM NAME	12.99" (tab before price, item starts with letter)
+    /^([A-Z][A-Z\s\*\-'&\.0-9]+?)\t+([\d,]+\.\d{1,2})$/,
+    // Format: "ITEM NAME 12.99" (single space, but item must be at least 3 chars and start with letter)
+    /^([A-Z][A-Z\s\*\-'&\.]{2,})\s+([\d,]+\.\d{1,2})\s*$/,
+    // More specific: Item name followed by price at end of line (name must contain letters)
+    /^([A-Z\s\*\-'&\.]*[A-Z][A-Z\s\*\-'&\.0-9]*?)\s+([\d,]+\.\d{1,2})$/,
   ];
   
   console.log(`Processing ${lines.length} lines for items`);
@@ -521,6 +521,8 @@ function parseReceiptText(text: string) {
       const match = line.match(pattern);
       if (match) {
         console.log(`[Item Debug] Line #${i} ("${line}") MATCHED pattern ${patternIndex}: ${pattern}`);
+        console.log(`[Item Debug] Match array content for line #${i}:`, match);
+        
         let price = 0;
         let name = '';
         let quantity = 1;
@@ -529,12 +531,14 @@ function parseReceiptText(text: string) {
           // Simple name + price
           name = match[1].trim();
           price = parseFloat(match[2].replace(/[$,]/g, ''));
+          console.log(`[Item Debug] Extracted from 3-element match - Name: "${name}", Price: "${price}"`);
         } else if (match.length === 4) {
           // Name + quantity + price
           name = match[1].trim();
           quantity = parseInt(match[2]) || 1;
           const unitPrice = parseFloat(match[3].replace(/[$,]/g, ''));
           price = quantity * unitPrice;
+          console.log(`[Item Debug] Extracted from 4-element match - Name: "${name}", Qty: "${quantity}", Unit Price: "${unitPrice}", Total Price: "${price}"`);
         }
         
         // Clean up name
