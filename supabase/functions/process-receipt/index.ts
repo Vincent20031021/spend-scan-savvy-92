@@ -18,13 +18,20 @@ serve(async (req) => {
   }
 
   try {
+    console.log('=== PROCESS-RECEIPT FUNCTION STARTED ===');
+    console.log('Request method:', req.method);
+    console.log('Request headers:', Object.fromEntries(req.headers.entries()));
+    
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get the authorization header
     const authorization = req.headers.get('Authorization');
     if (!authorization) {
+      console.error('CRITICAL ERROR: No authorization header found');
       throw new Error('No authorization header');
     }
+    
+    console.log('Authorization header present, length:', authorization.length);
 
     // Verify the JWT token
     const { data: { user }, error: authError } = await supabase.auth.getUser(
@@ -32,10 +39,32 @@ serve(async (req) => {
     );
 
     if (authError || !user) {
+      console.error('CRITICAL ERROR: Authentication failed:', authError);
       throw new Error('Unauthorized');
     }
+    
+    console.log('User authenticated successfully:', user.id);
 
-    const { imageBase64, fileName } = await req.json();
+    // Parse request body
+    let requestBody;
+    try {
+      const bodyText = await req.text();
+      console.log('Raw request body length:', bodyText.length);
+      console.log('Request body preview (first 200 chars):', bodyText.substring(0, 200));
+      
+      if (!bodyText || bodyText.trim() === '') {
+        console.error('CRITICAL ERROR: Request body is completely empty');
+        throw new Error('Request body is empty');
+      }
+      
+      requestBody = JSON.parse(bodyText);
+      console.log('Request body parsed successfully, keys:', Object.keys(requestBody));
+    } catch (parseError) {
+      console.error('CRITICAL ERROR: Failed to parse JSON body:', parseError);
+      throw new Error('Invalid JSON in request body');
+    }
+
+    const { imageBase64, fileName } = requestBody;
 
     if (!imageBase64) {
       throw new Error('No image provided');
@@ -65,12 +94,45 @@ serve(async (req) => {
     let extractedData = null;
     
     if (!googleVisionApiKey) {
-      console.error('Google Vision API key not configured');
+      console.error('CRITICAL ERROR: Google Vision API key not configured');
       throw new Error('Google Vision API key not configured');
     }
+    
+    console.log('API Key length:', googleVisionApiKey.length);
+    console.log('API Key prefix:', googleVisionApiKey.substring(0, 10) + '...');
 
     try {
-      console.log('Calling Google Vision API...');
+      console.log('Calling Google Vision API with base64 length:', imageBase64.length);
+      
+      // Validate base64 string
+      if (!imageBase64 || typeof imageBase64 !== 'string') {
+        throw new Error('Invalid base64 image data');
+      }
+      
+      // Remove data URL prefix if present
+      const cleanBase64 = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+      
+      const requestBody = {
+        requests: [{
+          image: { 
+            content: cleanBase64 
+          },
+          features: [
+            { 
+              type: 'DOCUMENT_TEXT_DETECTION',
+              maxResults: 1 
+            }
+          ]
+        }]
+      };
+      
+      console.log('Vision API request structure:', {
+        requestCount: requestBody.requests.length,
+        hasImage: !!requestBody.requests[0].image.content,
+        imageDataLength: requestBody.requests[0].image.content.length,
+        features: requestBody.requests[0].features
+      });
+      
       const visionResponse = await fetch(
         `https://vision.googleapis.com/v1/images:annotate?key=${googleVisionApiKey}`,
         {
@@ -78,25 +140,32 @@ serve(async (req) => {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            requests: [{
-              image: { content: imageBase64 },
-              features: [
-                { type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 }
-              ]
-            }]
-          })
+          body: JSON.stringify(requestBody)
         }
       );
 
+      console.log('Vision API response status:', visionResponse.status);
+      console.log('Vision API response headers:', Object.fromEntries(visionResponse.headers.entries()));
+
       if (!visionResponse.ok) {
         const errorText = await visionResponse.text();
-        console.error('Vision API HTTP error:', visionResponse.status, errorText);
-        throw new Error(`Vision API error: ${visionResponse.status}`);
+        console.error('Vision API HTTP error details:');
+        console.error('Status:', visionResponse.status);
+        console.error('Status Text:', visionResponse.statusText); 
+        console.error('Response:', errorText);
+        throw new Error(`Vision API error: ${visionResponse.status} - ${errorText}`);
       }
 
       const visionData = await visionResponse.json();
-      console.log('Vision API response:', JSON.stringify(visionData, null, 2));
+      
+      // Log response structure without the full content
+      console.log('Vision API response structure:', {
+        hasResponses: !!visionData.responses,
+        responseCount: visionData.responses?.length || 0,
+        hasTextAnnotations: !!(visionData.responses?.[0]?.textAnnotations),
+        annotationCount: visionData.responses?.[0]?.textAnnotations?.length || 0,
+        hasError: !!visionData.error
+      });
       
       if (visionData.error) {
         console.error('Vision API returned error:', visionData.error);
