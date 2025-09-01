@@ -62,24 +62,28 @@ export const CategoryPieChart = () => {
         label: 'Items by Category',
         data: categoryData.map(item => item.item_count),
         backgroundColor: [
-          'hsl(142, 76%, 45%)',     // Primary mint green
-          'hsl(142, 60%, 55%)',     // Lighter mint
-          'hsl(142, 50%, 35%)',     // Darker mint
-          'hsl(142, 70%, 65%)',     // Very light mint
-          'hsl(142, 40%, 40%)',     // Deep mint
-          'hsl(142, 80%, 50%)',     // Bright mint
-          'hsl(142, 30%, 45%)',     // Muted mint
-          'hsl(142, 90%, 40%)'      // Vibrant mint
+          '#FF6B6B',    // Coral red
+          '#4ECDC4',    // Turquoise
+          '#45B7D1',    // Sky blue  
+          '#96CEB4',    // Sage green
+          '#FFEAA7',    // Warm yellow
+          '#DDA0DD',    // Plum purple
+          '#98D8C8',    // Mint green
+          '#F7DC6F',    // Golden yellow
+          '#BB8FCE',    // Lavender
+          '#85C1E9'     // Light blue
         ],
         borderColor: [
-          'hsl(142, 76%, 36%)',     // Darker border
-          'hsl(142, 60%, 45%)',     
-          'hsl(142, 50%, 25%)',     
-          'hsl(142, 70%, 55%)',     
-          'hsl(142, 40%, 30%)',     
-          'hsl(142, 80%, 40%)',     
-          'hsl(142, 30%, 35%)',     
-          'hsl(142, 90%, 30%)'      
+          '#FF5252',    // Darker coral
+          '#26A69A',    // Darker turquoise  
+          '#2196F3',    // Darker blue
+          '#66BB6A',    // Darker sage
+          '#FFD54F',    // Darker yellow
+          '#BA68C8',    // Darker plum
+          '#4DB6AC',    // Darker mint
+          '#FFB74D',    // Darker gold
+          '#9575CD',    // Darker lavender
+          '#42A5F5'     // Darker light blue
         ],
         borderWidth: 2,
       },

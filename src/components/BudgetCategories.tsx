@@ -1,6 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Circle } from "lucide-react";
 
 interface BudgetCategoriesProps {
   totalSpent: number;
@@ -46,7 +45,6 @@ const BudgetCategories = ({ totalSpent, receipts }: BudgetCategoriesProps) => {
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg">Budget Category</CardTitle>
-          <Plus className="w-5 h-5 text-muted-foreground" />
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
