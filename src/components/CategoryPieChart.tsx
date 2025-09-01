@@ -62,30 +62,30 @@ export const CategoryPieChart = () => {
         label: 'Items by Category',
         data: categoryData.map(item => item.item_count),
         backgroundColor: [
-          '#FF6B6B',    // Coral red
-          '#4ECDC4',    // Turquoise
-          '#45B7D1',    // Sky blue  
-          '#96CEB4',    // Sage green
-          '#FFEAA7',    // Warm yellow
-          '#DDA0DD',    // Plum purple
-          '#98D8C8',    // Mint green
-          '#F7DC6F',    // Golden yellow
-          '#BB8FCE',    // Lavender
-          '#85C1E9'     // Light blue
+          'hsl(142, 45%, 60%)',    // Soft mint green
+          'hsl(160, 35%, 65%)',    // Muted teal
+          'hsl(180, 30%, 70%)',    // Pale cyan
+          'hsl(200, 25%, 75%)',    // Soft blue-gray
+          'hsl(220, 20%, 78%)',    // Light slate
+          'hsl(150, 40%, 68%)',    // Sage green
+          'hsl(170, 32%, 72%)',    // Dusty seafoam
+          'hsl(190, 28%, 76%)',    // Muted sky
+          'hsl(210, 22%, 80%)',    // Soft periwinkle
+          'hsl(140, 38%, 65%)'     // Light forest
         ],
         borderColor: [
-          '#FF5252',    // Darker coral
-          '#26A69A',    // Darker turquoise  
-          '#2196F3',    // Darker blue
-          '#66BB6A',    // Darker sage
-          '#FFD54F',    // Darker yellow
-          '#BA68C8',    // Darker plum
-          '#4DB6AC',    // Darker mint
-          '#FFB74D',    // Darker gold
-          '#9575CD',    // Darker lavender
-          '#42A5F5'     // Darker light blue
+          'hsl(142, 45%, 50%)',    // Slightly darker mint
+          'hsl(160, 35%, 55%)',    // Darker muted teal
+          'hsl(180, 30%, 60%)',    // Darker pale cyan
+          'hsl(200, 25%, 65%)',    // Darker soft blue-gray
+          'hsl(220, 20%, 68%)',    // Darker light slate
+          'hsl(150, 40%, 58%)',    // Darker sage green
+          'hsl(170, 32%, 62%)',    // Darker dusty seafoam
+          'hsl(190, 28%, 66%)',    // Darker muted sky
+          'hsl(210, 22%, 70%)',    // Darker soft periwinkle
+          'hsl(140, 38%, 55%)'     // Darker light forest
         ],
-        borderWidth: 2,
+        borderWidth: 1,
       },
     ],
   };
