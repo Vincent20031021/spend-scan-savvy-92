@@ -283,6 +283,34 @@ serve(async (req) => {
         console.error('Items insert error:', itemsError);
       } else {
         console.log(`Inserted ${items.length} items`);
+        
+        // Update category_id for the newly inserted items
+        console.log('Updating category_id for items...');
+        const updatePromises = items.map(async (item) => {
+          const { data: categoryData, error: categoryError } = await supabase
+            .from('categories')
+            .select('id')
+            .eq('name', item.category)
+            .single();
+
+          if (!categoryError && categoryData) {
+            const { error: updateError } = await supabase
+              .from('receipt_items')  
+              .update({ category_id: categoryData.id })
+              .eq('receipt_id', receipt.id)
+              .eq('item_name', item.item_name)
+              .eq('category', item.category);
+              
+            if (updateError) {
+              console.error(`Error updating category_id for item ${item.item_name}:`, updateError);
+            }
+          } else {
+            console.error(`Category not found for: ${item.category}`, categoryError);
+          }
+        });
+        
+        await Promise.all(updatePromises);
+        console.log('Category IDs updated successfully');
       }
     }
 

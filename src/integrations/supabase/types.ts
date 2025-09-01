@@ -14,9 +14,28 @@ export type Database = {
   }
   public: {
     Tables: {
+      categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       receipt_items: {
         Row: {
           category: string | null
+          category_id: string | null
           created_at: string
           id: string
           item_name: string
@@ -26,6 +45,7 @@ export type Database = {
         }
         Insert: {
           category?: string | null
+          category_id?: string | null
           created_at?: string
           id?: string
           item_name: string
@@ -35,6 +55,7 @@ export type Database = {
         }
         Update: {
           category?: string | null
+          category_id?: string | null
           created_at?: string
           id?: string
           item_name?: string
@@ -43,6 +64,13 @@ export type Database = {
           receipt_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "receipt_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "receipt_items_receipt_id_fkey"
             columns: ["receipt_id"]
@@ -99,7 +127,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_category_spending: {
+        Args: { user_uuid: string }
+        Returns: {
+          category_name: string
+          item_count: number
+          total_spent: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

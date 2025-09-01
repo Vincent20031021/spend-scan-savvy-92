@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useReceipts } from "@/hooks/useReceipts";
 import ReceiptDetailModal from "./ReceiptDetailModal";
+import { CategoryPieChart } from "./CategoryPieChart";
 
 const ReceiptScanner = () => {
   const { user, signOut } = useAuth();
@@ -281,68 +282,80 @@ const ReceiptScanner = () => {
         />
 
         {/* Recent Receipts */}
-        <Card className="bg-white/95 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5" />
-              Recent Receipts
-            </CardTitle>
-            <CardDescription>Your latest spending activity</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {loading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-                <p className="text-muted-foreground mt-4">Loading receipts...</p>
-              </div>
-            ) : receipts.length === 0 ? (
-              <div className="text-center py-8">
-                <Receipt className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No receipts yet. Upload your first receipt!</p>
-              </div>
-            ) : (
-              receipts.map((receipt, index) => (
-                <div 
-                  key={receipt.id} 
-                  className="flex items-center justify-between p-4 bg-muted/50 rounded-lg hover:bg-muted/70 transition-all duration-200 hover:scale-[1.02] animate-fade-in cursor-pointer"
-                  style={{ animationDelay: `${index * 100}ms` }}
-                  onClick={() => handleReceiptClick(receipt)}
-                >
-                  <div className="flex-1">
-                    <div className="font-semibold text-foreground">
-                      {receipt.store_name || 'Unknown Store'}
-                      {!receipt.store_name && (
-                        <span className="text-xs text-amber-600 dark:text-amber-400 ml-2">⚠️</span>
-                      )}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {formatDate(receipt.created_at)}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Leaf className="w-3 h-3" />
-                      <span className={`text-xs font-medium ${getSustainabilityColor(parseInt(receipt.sustainability_score || '0'))}`}>
-                        Eco Score: {getSustainabilityGrade(parseInt(receipt.sustainability_score || '0'))} ({receipt.sustainability_score || '0'}%)
-                      </span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bold text-lg">
-                      ${receipt.total_amount ? receipt.total_amount.toFixed(2) : '0.00'}
-                      {(!receipt.total_amount || receipt.total_amount === 0) && (
-                        <span className="text-xs text-amber-600 dark:text-amber-400 ml-1">⚠️</span>
-                      )}
-                    </div>
-                    <Badge 
-                      className={`text-xs text-white ${categoryColors[receipt.category as keyof typeof categoryColors] || 'bg-secondary'}`}
-                    >
-                      {receipt.category || 'Other'}
-                    </Badge>
-                  </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="bg-white/95 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="w-5 h-5" />
+                Recent Receipts
+              </CardTitle>
+              <CardDescription>Your latest spending activity</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {loading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                  <p className="text-muted-foreground mt-4">Loading receipts...</p>
                 </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
+              ) : receipts.length === 0 ? (
+                <div className="text-center py-8">
+                  <Receipt className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No receipts yet. Upload your first receipt!</p>
+                </div>
+              ) : (
+                receipts.slice(0, 5).map((receipt, index) => (
+                  <div 
+                    key={receipt.id} 
+                    className="flex items-center justify-between p-4 bg-muted/50 rounded-lg hover:bg-muted/70 transition-all duration-200 hover:scale-[1.02] animate-fade-in cursor-pointer"
+                    style={{ animationDelay: `${index * 100}ms` }}
+                    onClick={() => handleReceiptClick(receipt)}
+                  >
+                    <div className="flex-1">
+                      <div className="font-semibold text-foreground">
+                        {receipt.store_name || 'Unknown Store'}
+                        {!receipt.store_name && (
+                          <span className="text-xs text-amber-600 dark:text-amber-400 ml-2">⚠️</span>
+                        )}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {formatDate(receipt.created_at)}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Leaf className="w-3 h-3" />
+                        <span className={`text-xs font-medium ${getSustainabilityColor(parseInt(receipt.sustainability_score || '0'))}`}>
+                          Eco Score: {getSustainabilityGrade(parseInt(receipt.sustainability_score || '0'))} ({receipt.sustainability_score || '0'}%)
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-lg">
+                        ${receipt.total_amount ? receipt.total_amount.toFixed(2) : '0.00'}
+                        {(!receipt.total_amount || receipt.total_amount === 0) && (
+                          <span className="text-xs text-amber-600 dark:text-amber-400 ml-1">⚠️</span>
+                        )}
+                      </div>
+                      <Badge 
+                        className={`text-xs text-white ${categoryColors[receipt.category as keyof typeof categoryColors] || 'bg-secondary'}`}
+                      >
+                        {receipt.category || 'Other'}
+                      </Badge>
+                    </div>
+                  </div>
+                ))
+              )}
+              {receipts.length > 5 && (
+                <div className="text-center pt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Showing 5 of {receipts.length} receipts
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Category Pie Chart */}
+          <CategoryPieChart />
+        </div>
 
         {/* Bottom Navigation Placeholder */}
         <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-border/20 p-4">
@@ -363,6 +376,16 @@ const ReceiptScanner = () => {
             setSelectedReceipt(null);
           }}
         />
+
+        {/* Bottom Navigation Placeholder */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-border/20 p-4">
+          <div className="flex justify-center">
+            <Button variant="ghost" className="text-muted-foreground">
+              <User className="w-4 h-4 mr-2" />
+              Welcome, {user.email}
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

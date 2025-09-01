@@ -34,17 +34,18 @@ const ReceiptDetailModal = ({ receipt, isOpen, onClose }: ReceiptDetailModalProp
         .then((data) => {
           console.log('ReceiptDetailModal: Items fetched:', data);
           setItems(data);
-          setLoadingItems(false);
         })
         .catch((error) => {
           console.error('ReceiptDetailModal: Error fetching items:', error);
+        })
+        .finally(() => {
           setLoadingItems(false);
         });
     } else {
       console.log('ReceiptDetailModal: Not fetching items', { receipt: !!receipt, isOpen });
       setItems([]);
     }
-  }, [receipt, isOpen, getReceiptItems]);
+  }, [receipt?.id, isOpen]); // Fixed dependency array to prevent infinite loops
 
   if (!receipt) return null;
 
