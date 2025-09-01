@@ -11,6 +11,14 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const googleVisionApiKey = Deno.env.get('GOOGLE_VISION_API_KEY');
 
+console.log('=== ENVIRONMENT VARIABLES DEBUG ===');
+console.log('SUPABASE_URL present:', !!supabaseUrl);
+console.log('SUPABASE_SERVICE_ROLE_KEY present:', !!supabaseServiceKey);
+console.log('GOOGLE_VISION_API_KEY present:', !!googleVisionApiKey);
+console.log('GOOGLE_VISION_API_KEY length:', googleVisionApiKey?.length || 0);
+console.log('All env vars:', Object.keys(Deno.env.toObject()).filter(key => key.includes('GOOGLE') || key.includes('VISION')));
+console.log('=====================================');
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
