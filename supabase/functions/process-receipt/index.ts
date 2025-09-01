@@ -235,6 +235,13 @@ serve(async (req) => {
       raw_text: extractedData?.rawText || ''
     };
 
+    console.log('--- DEBUG: receiptData before insertion ---');
+    console.log(JSON.stringify(receiptData, null, 2));
+    console.log('--- DEBUG: extractedData.items before insertion ---');
+    console.log(JSON.stringify(extractedData?.items || [], null, 2));
+    console.log('--- DEBUG: items array length:', extractedData?.items?.length || 0);
+    console.log('-------------------------------------------');
+
     const { data: receipt, error: receiptError } = await supabase
       .from('receipts')
       .insert(receiptData)
@@ -257,6 +264,16 @@ serve(async (req) => {
         price: item.price || 0,
         quantity: item.quantity || 1
       }));
+
+      console.log('--- DEBUG: Items being inserted into database ---');
+      console.log(JSON.stringify(items, null, 2));
+      console.log('--- DEBUG: First item details ---');
+      if (items.length > 0) {
+        console.log('First item.name:', JSON.stringify(items[0].item_name));
+        console.log('First item.name length:', items[0].item_name?.length || 0);
+        console.log('First item.name type:', typeof items[0].item_name);
+      }
+      console.log('-------------------------------------------');
 
       const { error: itemsError } = await supabase
         .from('receipt_items')
@@ -472,20 +489,19 @@ function parseReceiptText(text: string) {
   ];
   
   const itemPatterns = [
-    // Quantity format: "2 @ $3.25 EACH" or "Item 2 @ $3.99"
-    /^(.+?)\s+(\d+)\s*@\s*\$?([\d,]+\.\d{1,2})/,
-    // Quantity format: "Item 2 x $3.99" or "2 x Item Name $3.99"
-    /^(.+?)\s+(\d+)\s*x\s*\$?([\d,]+\.\d{1,2})/i,
-    // Format: "ITEM NAME $12.99" (with dollar sign)
-    /^([A-Z][A-Z\s\*\-'&\.0-9]+?)\s+\$\s*([\d,]+\.\d{1,2})$/,
-    // Format: "ITEM NAME    12.99" (multiple spaces before price, item starts with letter)
-    /^([A-Z][A-Z\s\*\-'&\.0-9]+?)\s{2,}([\d,]+\.\d{1,2})$/,
-    // Format: "ITEM NAME	12.99" (tab before price, item starts with letter)
-    /^([A-Z][A-Z\s\*\-'&\.0-9]+?)\t+([\d,]+\.\d{1,2})$/,
-    // Format: "ITEM NAME 12.99" (single space, but item must be at least 3 chars and start with letter)
-    /^([A-Z][A-Z\s\*\-'&\.]{2,})\s+([\d,]+\.\d{1,2})\s*$/,
-    // More specific: Item name followed by price at end of line (name must contain letters)
-    /^([A-Z\s\*\-'&\.]*[A-Z][A-Z\s\*\-'&\.0-9]*?)\s+([\d,]+\.\d{1,2})$/,
+    // Multi-line scenarios handled separately, but patterns for quantity items
+    // Format: "Item Name 2 @ $3.25 EACH" or "Item Name 2 @ 3.25"
+    /^([A-Z][A-Z\s\*\-'&\.]{2,40})\s+(\d+)\s*@\s*\$?([\d,]+\.\d{1,2})/,
+    // Format: "Item Name 2 x $3.99" 
+    /^([A-Z][A-Z\s\*\-'&\.]{2,40})\s+(\d+)\s*[xX]\s*\$?([\d,]+\.\d{1,2})/,
+    // Format: "ITEM NAME $12.99" (with dollar sign, name must be substantial)
+    /^([A-Z][A-Z\s\*\-'&\.]{3,40})\s+\$\s*([\d,]+\.\d{1,2})$/,
+    // Format: "ITEM NAME    12.99" (multiple spaces, name must be substantial)
+    /^([A-Z][A-Z\s\*\-'&\.]{3,40})\s{2,}([\d,]+\.\d{1,2})$/,
+    // Format: "ITEM NAME	12.99" (tab separated, name must be substantial)
+    /^([A-Z][A-Z\s\*\-'&\.]{3,40})\t+([\d,]+\.\d{1,2})$/,
+    // Format: "ITEM NAME 12.99" (single space, name must be substantial and not end with numbers)
+    /^([A-Z][A-Z\s\*\-'&\.]*[A-Z][A-Z\s\*\-'&\.]{2,35})\s+([\d,]+\.\d{1,2})$/,
   ];
   
   console.log(`Processing ${lines.length} lines for items`);
