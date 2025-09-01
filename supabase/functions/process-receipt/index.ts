@@ -472,12 +472,20 @@ function parseReceiptText(text: string) {
   ];
   
   const itemPatterns = [
-    /^(.+?)\s+\$?([\d,]+\.\d{2})$/,  // Item name followed by price with cents
-    /^(.+?)\s{2,}\$?([\d,]+\.\d{2})$/,  // With multiple spaces
-    /^(.+?)\t+\$?([\d,]+\.\d{2})$/,  // With tabs
-    /^([\w\s\-'&\.]+)\s+(\d+)\s*@\s*\$?([\d,]+\.\d{2})/,  // Quantity format: "Item 2 @ $3.99"
-    /^([\w\s\-'&\.]+)\s+(\d+)\s*x\s*\$?([\d,]+\.\d{2})/i,  // Quantity format: "Item 2 x $3.99"
-    /^\s*(.+?)\s+(\d+\.\d{2})\s*$/,  // Simple: "Item Name 4.99"
+    // Format: "MANGO KENSINGTON PRIDE 200 2.90" (item name with embedded price at end)
+    /^([A-Z\s\*\-'&\.0-9]+?)\s+([\d,]+\.\d{1,2})$/,
+    // Format: "Item name    $12.99" (with dollar sign)
+    /^(.+?)\s+\$\s*([\d,]+\.\d{1,2})$/,
+    // Format: "Item name     12.99" (spaces before price)
+    /^(.+?)\s{2,}([\d,]+\.\d{1,2})$/,
+    // Format: "Item name	12.99" (tab before price)
+    /^(.+?)\t+([\d,]+\.\d{1,2})$/,
+    // Quantity format: "Item 2 @ $3.99"
+    /^([\w\s\-'&\.]+)\s+(\d+)\s*@\s*\$?([\d,]+\.\d{1,2})/,
+    // Quantity format: "Item 2 x $3.99"
+    /^([\w\s\-'&\.]+)\s+(\d+)\s*x\s*\$?([\d,]+\.\d{1,2})/i,
+    // Just numbers at end: "Item Name 4.99"
+    /^(.+?)\s+([\d,]+\.\d{1,2})\s*$/,
   ];
   
   console.log(`Processing ${lines.length} lines for items`);
@@ -485,16 +493,31 @@ function parseReceiptText(text: string) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
+    console.log(`[Item Parsing] Processing line ${i}: "${line}"`);
+    
     // Skip empty lines or lines matching skip patterns
-    if (!line || skipPatterns.some(pattern => pattern.test(line))) {
+    if (!line) {
+      console.log(`[Item Parsing] Skipping empty line: ${i}`);
       continue;
     }
     
+    let shouldSkip = false;
+    for (const pattern of skipPatterns) {
+      if (pattern.test(line)) {
+        console.log(`[Item Parsing] Skipping line ${i} due to skip pattern: "${line}"`);
+        shouldSkip = true;
+        break;
+      }
+    }
+    if (shouldSkip) continue;
+    
     // Try each pattern
     let itemFound = false;
-    for (const pattern of itemPatterns) {
+    for (let patternIndex = 0; patternIndex < itemPatterns.length; patternIndex++) {
+      const pattern = itemPatterns[patternIndex];
       const match = line.match(pattern);
       if (match) {
+        console.log(`[Item Parsing] Pattern ${patternIndex} matched for line ${i}: "${line}" -> match:`, match);
         let price = 0;
         let name = '';
         let quantity = 1;
@@ -528,11 +551,17 @@ function parseReceiptText(text: string) {
             category: categorizeItem(name),
             quantity: quantity
           });
-          console.log(`Found item: ${name} - $${price} (qty: ${quantity})`);
+          console.log(`[Item Parsing] Successfully added item: ${name} - $${price} (qty: ${quantity})`);
           itemFound = true;
           break;
+        } else {
+          console.log(`[Item Parsing] FAILED item validation for line ${i}: Name: "${name}", Price: ${price}, Name length: ${name.length}`);
         }
       }
+    }
+    
+    if (!itemFound) {
+      console.log(`[Item Parsing] No pattern matched for line ${i}: "${line}"`);
     }
   }
 
