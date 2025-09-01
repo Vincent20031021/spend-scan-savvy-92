@@ -62,28 +62,28 @@ export const CategoryPieChart = () => {
         label: 'Items by Category',
         data: categoryData.map(item => item.item_count),
         backgroundColor: [
-          'hsl(142, 45%, 60%)',    // Soft mint green
-          'hsl(160, 35%, 65%)',    // Muted teal
-          'hsl(180, 30%, 70%)',    // Pale cyan
-          'hsl(200, 25%, 75%)',    // Soft blue-gray
-          'hsl(220, 20%, 78%)',    // Light slate
-          'hsl(150, 40%, 68%)',    // Sage green
-          'hsl(170, 32%, 72%)',    // Dusty seafoam
-          'hsl(190, 28%, 76%)',    // Muted sky
-          'hsl(210, 22%, 80%)',    // Soft periwinkle
-          'hsl(140, 38%, 65%)'     // Light forest
+          'hsl(142, 30%, 85%)',    // Very light mint
+          'hsl(160, 25%, 88%)',    // Pale teal
+          'hsl(180, 20%, 90%)',    // Very pale cyan
+          'hsl(200, 18%, 92%)',    // Light blue-gray
+          'hsl(220, 15%, 94%)',    // Very light slate
+          'hsl(150, 28%, 87%)',    // Light sage
+          'hsl(170, 22%, 89%)',    // Pale seafoam
+          'hsl(190, 18%, 91%)',    // Very light sky
+          'hsl(210, 15%, 93%)',    // Pale periwinkle
+          'hsl(140, 25%, 86%)'     // Light forest
         ],
         borderColor: [
-          'hsl(142, 45%, 50%)',    // Slightly darker mint
-          'hsl(160, 35%, 55%)',    // Darker muted teal
-          'hsl(180, 30%, 60%)',    // Darker pale cyan
-          'hsl(200, 25%, 65%)',    // Darker soft blue-gray
-          'hsl(220, 20%, 68%)',    // Darker light slate
-          'hsl(150, 40%, 58%)',    // Darker sage green
-          'hsl(170, 32%, 62%)',    // Darker dusty seafoam
-          'hsl(190, 28%, 66%)',    // Darker muted sky
-          'hsl(210, 22%, 70%)',    // Darker soft periwinkle
-          'hsl(140, 38%, 55%)'     // Darker light forest
+          'hsl(142, 30%, 75%)',    // Slightly darker light mint
+          'hsl(160, 25%, 78%)',    // Darker pale teal
+          'hsl(180, 20%, 80%)',    // Darker very pale cyan
+          'hsl(200, 18%, 82%)',    // Darker light blue-gray
+          'hsl(220, 15%, 84%)',    // Darker very light slate
+          'hsl(150, 28%, 77%)',    // Darker light sage
+          'hsl(170, 22%, 79%)',    // Darker pale seafoam
+          'hsl(190, 18%, 81%)',    // Darker very light sky
+          'hsl(210, 15%, 83%)',    // Darker pale periwinkle
+          'hsl(140, 25%, 76%)'     // Darker light forest
         ],
         borderWidth: 1,
       },
