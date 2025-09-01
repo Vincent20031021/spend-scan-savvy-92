@@ -489,35 +489,38 @@ function parseReceiptText(text: string) {
   ];
   
   console.log(`Processing ${lines.length} lines for items`);
+  console.log('First 10 lines:', lines.slice(0, 10));
+  console.log('Last 10 lines:', lines.slice(-10));
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
-    console.log(`[Item Parsing] Processing line ${i}: "${line}"`);
+    console.log(`[Item Debug] Processing line #${i}: "${line}"`);
     
-    // Skip empty lines or lines matching skip patterns
+    // Skip empty lines
     if (!line) {
-      console.log(`[Item Parsing] Skipping empty line: ${i}`);
+      console.log(`[Item Debug] SKIPPING line #${i} (empty)`);
       continue;
     }
     
+    // Check skip patterns
     let shouldSkip = false;
     for (const pattern of skipPatterns) {
       if (pattern.test(line)) {
-        console.log(`[Item Parsing] Skipping line ${i} due to skip pattern: "${line}"`);
+        console.log(`[Item Debug] SKIPPING line #${i} (matches skip pattern): "${line}"`);
         shouldSkip = true;
         break;
       }
     }
     if (shouldSkip) continue;
     
-    // Try each pattern
+    // Try single-line patterns first
     let itemFound = false;
     for (let patternIndex = 0; patternIndex < itemPatterns.length; patternIndex++) {
       const pattern = itemPatterns[patternIndex];
       const match = line.match(pattern);
       if (match) {
-        console.log(`[Item Parsing] Pattern ${patternIndex} matched for line ${i}: "${line}" -> match:`, match);
+        console.log(`[Item Debug] Line #${i} ("${line}") MATCHED pattern ${patternIndex}: ${pattern}`);
         let price = 0;
         let name = '';
         let quantity = 1;
@@ -551,19 +554,58 @@ function parseReceiptText(text: string) {
             category: categorizeItem(name),
             quantity: quantity
           });
-          console.log(`[Item Parsing] Successfully added item: ${name} - $${price} (qty: ${quantity})`);
+          console.log(`[Item Debug] SUCCESSFULLY ADDED item from line #${i}: Name: "${name}", Price: ${price}, Qty: ${quantity}`);
           itemFound = true;
           break;
         } else {
-          console.log(`[Item Parsing] FAILED item validation for line ${i}: Name: "${name}", Price: ${price}, Name length: ${name.length}`);
+          console.log(`[Item Debug] Line #${i} ("${line}") FAILED item VALIDATION. Name: "${name}", Price: ${price}`);
+        }
+      }
+    }
+    
+    // If no single-line pattern matched, try multi-line pattern (item name followed by price on next line)
+    if (!itemFound && i < lines.length - 1) {
+      const currentLine = line;
+      const nextLine = lines[i + 1]?.trim();
+      
+      // Check if current line looks like an item name and next line is a price
+      const itemNamePattern = /^([A-Z\s\*\-'&\.0-9]{3,50})$/;
+      const pricePattern = /^(\d+\.\d{1,2})$/;
+      
+      if (itemNamePattern.test(currentLine) && nextLine && pricePattern.test(nextLine)) {
+        const name = currentLine.replace(/[^\w\s\-'&\.]/g, '').trim();
+        const price = parseFloat(nextLine);
+        
+        console.log(`[Item Debug] Multi-line match found: Line #${i} ("${currentLine}") + Line #${i+1} ("${nextLine}")`);
+        
+        // Validate multi-line item
+        if (name.length >= 2 && 
+            name.length <= 50 && 
+            price > 0 && 
+            price <= 1000 && 
+            !name.match(/^\d+$/) && 
+            !name.toLowerCase().match(/(total|tax|subtotal|change|payment|cash|credit|debit|description|store|phone|manager|served|register|receipt|time)/)) {
+          items.push({
+            name: name.substring(0, 100),
+            price: Math.round(price * 100) / 100,
+            category: categorizeItem(name),
+            quantity: 1
+          });
+          console.log(`[Item Debug] SUCCESSFULLY ADDED multi-line item: Name: "${name}", Price: ${price}`);
+          itemFound = true;
+          i++; // Skip next line since we consumed it
+        } else {
+          console.log(`[Item Debug] Multi-line item FAILED validation: Name: "${name}", Price: ${price}`);
         }
       }
     }
     
     if (!itemFound) {
-      console.log(`[Item Parsing] No pattern matched for line ${i}: "${line}"`);
+      console.log(`[Item Debug] Line #${i} ("${line}") did NOT match any item pattern.`);
     }
   }
+  
+  console.log('Extracted items count:', items.length);
 
   console.log('Extracted items:', items.length);
 
