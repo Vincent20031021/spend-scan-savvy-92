@@ -138,7 +138,7 @@ const ReceiptDetailModal = ({ receipt, isOpen, onClose }: ReceiptDetailModalProp
                 {items.map((item) => (
                   <div key={item.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
                     <div className="flex-1">
-                      <p className="font-medium">{item.item_name}</p>
+                      <p className="font-medium">{item.name || item.item_name || 'Unknown Item'}</p>
                       <div className="flex items-center gap-2 mt-1">
                         <Badge variant="outline" className="text-xs">
                           {item.category}
