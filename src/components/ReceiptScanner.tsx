@@ -3,12 +3,13 @@ import { Navigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Camera, Upload, Scan, Receipt, TrendingUp, Leaf, LogOut, User } from "lucide-react";
+import { Camera, Upload, Scan, Receipt, TrendingUp, Leaf, LogOut, User, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useReceipts } from "@/hooks/useReceipts";
 import ReceiptDetailModal from "./ReceiptDetailModal";
 import { CategoryPieChart } from "./CategoryPieChart";
+import BudgetCategories from "./BudgetCategories";
 
 const ReceiptScanner = () => {
   const { user, signOut } = useAuth();
@@ -181,67 +182,106 @@ const ReceiptScanner = () => {
   const avgSustainabilityScore = calculateAverageSustainabilityScore();
 
   return (
-    <div className="min-h-screen bg-gradient-hero">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-mint">
+      <div className="container mx-auto px-4 py-6">
         {/* Header */}
-        <div className="flex justify-between items-start mb-8">
-          <div className="text-center flex-1">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full mb-4">
-              <Receipt className="w-8 h-8 text-white" />
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+              <Receipt className="w-5 h-5 text-primary" />
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2">Receipt Scanner</h1>
-            <p className="text-white/80 text-lg">Track your spending effortlessly</p>
+            <h1 className="text-xl font-semibold text-foreground">Budget Tracker</h1>
           </div>
           
-          {/* User Menu */}
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-white/80 hover:text-white hover:bg-white/10"
-              onClick={signOut}
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
-            </Button>
+            <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+              <User className="w-4 h-4 text-white" />
+            </div>
           </div>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-3 gap-3 mb-8">
-          <Card className="bg-white/10 backdrop-blur-sm border-white/20 animate-fade-in">
-            <CardContent className="p-4 text-center">
-              <div className="text-xl font-bold text-white">
-                ${totalSpending.toFixed(2)}
+        {/* Welcome Section */}
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-foreground mb-1">
+            Welcome, {user.email?.split('@')[0]}!
+          </h2>
+        </div>
+
+        {/* Balance and Expense Cards */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <Card className="bg-card shadow-soft border-border/50">
+            <CardContent className="p-4">
+              <div className="text-sm text-muted-foreground mb-1">Total Balance</div>
+              <div className="text-2xl font-bold text-foreground">
+                ${(7783 - totalSpending).toFixed(2)}
               </div>
-              <div className="text-white/70 text-xs">This Week</div>
             </CardContent>
           </Card>
-          <Card className="bg-white/10 backdrop-blur-sm border-white/20 animate-fade-in">
-            <CardContent className="p-4 text-center">
-              <div className="text-xl font-bold text-white">{receipts.length}</div>
-              <div className="text-white/70 text-xs">Receipts</div>
+          <Card className="bg-card shadow-soft border-border/50">
+            <CardContent className="p-4">
+              <div className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
+                <TrendingUp className="w-3 h-3" />
+                Total Expense
+              </div>
+              <div className="text-2xl font-bold text-primary">
+                -${totalSpending.toFixed(2)}
+              </div>
             </CardContent>
           </Card>
-          <Card className="bg-white/10 backdrop-blur-sm border-white/20 animate-fade-in">
-            <CardContent className="p-4 text-center">
-              <div className="flex items-center justify-center gap-1">
-                <Leaf className="w-4 h-4 text-sustainability-good" />
-                <div className="text-xl font-bold text-sustainability-good">
-                  {getSustainabilityGrade(avgSustainabilityScore)}
+        </div>
+
+        {/* Budget Progress */}
+        <Card className="bg-card shadow-soft border-border/50 mb-6">
+          <CardContent className="p-4">
+            <div className="flex justify-between items-center mb-2">
+              <div className="text-lg font-semibold">Budget Progress</div>
+              <div className="text-lg font-bold text-primary">$1,000.00</div>
+            </div>
+            <div className="w-full bg-muted rounded-full h-3 mb-2">
+              <div 
+                className="bg-primary h-3 rounded-full transition-all duration-500" 
+                style={{ width: `${Math.min((totalSpending / 1000) * 100, 100)}%` }}
+              ></div>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {((totalSpending / 1000) * 100).toFixed(0)}% of your expenses. Looking good!
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Budget Categories and Sustainability Score */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="lg:col-span-2">
+            <BudgetCategories totalSpent={totalSpending} receipts={receipts} />
+          </div>
+          
+          <Card className="bg-card shadow-soft border-border/50">
+            <CardContent className="p-6 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 relative">
+                <div className="w-full h-full bg-primary/10 rounded-full flex items-center justify-center">
+                  <Leaf className="w-8 h-8 text-primary" />
+                </div>
+                <div className="absolute inset-0 border-4 border-primary rounded-full" 
+                     style={{ 
+                       background: `conic-gradient(hsl(var(--primary)) ${(avgSustainabilityScore / 100) * 360}deg, hsl(var(--muted)) 0deg)` 
+                     }}>
                 </div>
               </div>
-              <div className="text-white/70 text-xs">Eco Score</div>
+              <div className="text-lg font-semibold text-foreground mb-1">Sustainability</div>
+              <div className="text-sm text-muted-foreground">On Goals</div>
+              <div className="text-2xl font-bold text-primary mt-2">
+                {getSustainabilityGrade(avgSustainabilityScore)}
+              </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Scan Actions */}
-        <div className="grid grid-cols-2 gap-4 mb-8">
+        <div className="grid grid-cols-2 gap-4 mb-6">
           <Button
             onClick={handleScanReceipt}
             disabled={processing}
-            className={`h-24 bg-white/20 backdrop-blur-sm border-white/30 hover:bg-white/30 text-white font-semibold transition-all duration-300 hover:scale-105 active:scale-95 ${
+            className={`h-20 bg-card shadow-soft hover:shadow-elegant border-border/50 text-foreground font-semibold transition-all duration-300 hover:scale-[1.02] ${
               processing ? 'animate-pulse-scale' : ''
             }`}
             variant="outline"
@@ -249,11 +289,10 @@ const ReceiptScanner = () => {
             <div className="flex flex-col items-center gap-2">
               {processing ? (
                 <div className="relative">
-                  <Scan className="w-6 h-6 animate-spin" />
-                  <div className="absolute inset-0 bg-white/20 rounded-full animate-ping"></div>
+                  <Scan className="w-6 h-6 animate-spin text-primary" />
                 </div>
               ) : (
-                <Camera className="w-6 h-6" />
+                <Camera className="w-6 h-6 text-primary" />
               )}
               <span>{processing ? "Processing..." : "Scan Receipt"}</span>
             </div>
@@ -262,11 +301,11 @@ const ReceiptScanner = () => {
           <Button
             onClick={handleUploadReceipt}
             disabled={processing}
-            className="h-24 bg-white/20 backdrop-blur-sm border-white/30 hover:bg-white/30 text-white font-semibold transition-all duration-300 hover:scale-105 active:scale-95"
+            className="h-20 bg-card shadow-soft hover:shadow-elegant border-border/50 text-foreground font-semibold transition-all duration-300 hover:scale-[1.02]"
             variant="outline"
           >
             <div className="flex flex-col items-center gap-2">
-              <Upload className="w-6 h-6" />
+              <Upload className="w-6 h-6 text-primary" />
               <span>Upload Image</span>
             </div>
           </Button>
@@ -283,10 +322,10 @@ const ReceiptScanner = () => {
 
         {/* Recent Receipts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="bg-white/95 backdrop-blur-sm">
+          <Card className="bg-card shadow-soft border-border/50">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5" />
+              <CardTitle className="flex items-center gap-2 text-foreground">
+                <TrendingUp className="w-5 h-5 text-primary" />
                 Recent Receipts
               </CardTitle>
               <CardDescription>Your latest spending activity</CardDescription>
@@ -306,7 +345,7 @@ const ReceiptScanner = () => {
                 receipts.slice(0, 5).map((receipt, index) => (
                   <div 
                     key={receipt.id} 
-                    className="flex items-center justify-between p-4 bg-muted/50 rounded-lg hover:bg-muted/70 transition-all duration-200 hover:scale-[1.02] animate-fade-in cursor-pointer"
+                    className="flex items-center justify-between p-4 bg-background/50 rounded-lg hover:bg-background/70 transition-all duration-200 hover:scale-[1.02] animate-fade-in cursor-pointer border border-border/30"
                     style={{ animationDelay: `${index * 100}ms` }}
                     onClick={() => handleReceiptClick(receipt)}
                   >
@@ -357,16 +396,6 @@ const ReceiptScanner = () => {
           <CategoryPieChart />
         </div>
 
-        {/* Bottom Navigation Placeholder */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-border/20 p-4">
-          <div className="flex justify-center">
-            <Button variant="ghost" className="text-muted-foreground">
-              <User className="w-4 h-4 mr-2" />
-              Welcome, {user.email}
-            </Button>
-          </div>
-        </div>
-
         {/* Receipt Detail Modal */}
         <ReceiptDetailModal 
           receipt={selectedReceipt}
@@ -377,14 +406,15 @@ const ReceiptScanner = () => {
           }}
         />
 
-        {/* Bottom Navigation Placeholder */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-border/20 p-4">
-          <div className="flex justify-center">
-            <Button variant="ghost" className="text-muted-foreground">
-              <User className="w-4 h-4 mr-2" />
-              Welcome, {user.email}
-            </Button>
-          </div>
+        {/* Floating Action Button */}
+        <div className="fixed bottom-6 right-6">
+          <Button
+            onClick={handleUploadReceipt}
+            size="lg"
+            className="w-14 h-14 rounded-full bg-primary hover:bg-primary/90 shadow-elegant"
+          >
+            <Plus className="w-6 h-6" />
+          </Button>
         </div>
       </div>
     </div>
