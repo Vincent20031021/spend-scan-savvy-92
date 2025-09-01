@@ -28,11 +28,21 @@ const ReceiptDetailModal = ({ receipt, isOpen, onClose }: ReceiptDetailModalProp
 
   useEffect(() => {
     if (receipt && isOpen) {
+      console.log('ReceiptDetailModal: Fetching items for receipt:', receipt.id);
       setLoadingItems(true);
-      getReceiptItems(receipt.id).then((data) => {
-        setItems(data);
-        setLoadingItems(false);
-      });
+      getReceiptItems(receipt.id)
+        .then((data) => {
+          console.log('ReceiptDetailModal: Items fetched:', data);
+          setItems(data);
+          setLoadingItems(false);
+        })
+        .catch((error) => {
+          console.error('ReceiptDetailModal: Error fetching items:', error);
+          setLoadingItems(false);
+        });
+    } else {
+      console.log('ReceiptDetailModal: Not fetching items', { receipt: !!receipt, isOpen });
+      setItems([]);
     }
   }, [receipt, isOpen, getReceiptItems]);
 

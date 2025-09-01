@@ -141,8 +141,12 @@ export function useReceipts() {
   };
 
   const getReceiptItems = async (receiptId: string): Promise<ReceiptItem[]> => {
-    if (!user) return [];
+    if (!user) {
+      console.log('getReceiptItems: No user, returning empty array');
+      return [];
+    }
 
+    console.log('getReceiptItems: Fetching items for receipt:', receiptId);
     try {
       const { data, error } = await supabase
         .from('receipt_items')
@@ -151,13 +155,15 @@ export function useReceipts() {
         .order('created_at', { ascending: true });
 
       if (error) {
-        console.error('Error fetching receipt items:', error);
+        console.error('getReceiptItems: Supabase error:', error);
         return [];
       }
 
+      console.log('getReceiptItems: Raw data from Supabase:', data);
+      console.log('getReceiptItems: Returning', data?.length || 0, 'items');
       return data || [];
     } catch (error) {
-      console.error('Error fetching receipt items:', error);
+      console.error('getReceiptItems: Catch error:', error);
       return [];
     }
   };
